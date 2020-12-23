@@ -41,17 +41,17 @@ You can import the .zip file from the IDE with *Sketch / Include Library / Add .
 # Hardware
 The library support hardware elements like encoders, faders, buttons with some helper functions. The library allows you to use hardware elements as an object and with the use of the helper functions, code becomes much easier to write and read and to understand.
 - **Buttons**
-	You can use every momentary push button on the market, e.g. MX Keys which are also used by MA Lighting, the keys are available with different push characters and have therefore different color markers. One pin must connect to a Digital Pin D*x* the other to ground.
-	**! A 100nF capitor is recommanded between the button pins !**
+	You can use every momentary push button on the market, e.g. MX Keys which are also used by MA Lighting, the keys are available with different push characters and have therefore different color markers. One pin must connect to a Digital Pin D*x* the other to ground.<br>
+	**! A 100nF capitor is recommanded between the button pins !**<br>
 - **Faders**
   Recommanded are linear faders with 10k Ohm from **Bourns** or **ALPS** which are available in different lengths and qualities.
-	Beware that ARM boards like STM32-Nucleo use 3.3V, classic AVR boards like Arduino UNO use 5V. The leveler must connect to the Analog Pin A*x*. The other pin must connect to ground and 3.3/5 V depending on hardware alignment.
-	**! A 10nF capitor is recommanded between leveler and ground !**
+	Beware that ARM boards like STM32-Nucleo use 3.3V, classic AVR boards like Arduino UNO use 5V. The leveler must connect to the Analog Pin A*x*. The other pin must connect to ground and 3.3/5 V depending on hardware alignment.<br>
+	**! A 10nF capitor is recommanded between leveler and ground !**<br>
 
 - **Rotary Encoders**
   You can use encoders from **ALPS** or equivalent.
-	The middle pin of the encoders must connect to ground, the both other pins A/B must connect to Digital Pins D*x*.
-  **! Two 100nF capitors are recommanded between the button pin A/B and ground !**
+	The middle pin of the encoders must connect to ground, the both other pins A/B must connect to Digital Pins D*x*.<br>
+  **! Two 100nF capitors are recommanded between the button pin A/B and ground !**<br>
 
 ## Additional Advices for Analog Pins
 - **Arduino UNO, MEGA with WIZnet5500**
