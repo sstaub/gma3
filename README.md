@@ -138,7 +138,7 @@ There are some basic examples for for different board types using the Arduino ID
 
 ## gma3
 Is a project folder for use with PlatformIO and includes the Example code as a starting point.
-![Development on PlatformIO](gma_development.png)
+![Development on PlatformIO](../images/gma_development.png)
 
 # Helper functions
 
