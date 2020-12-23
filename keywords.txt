@@ -1,0 +1,25 @@
+# eOS Classes
+Key	KEYWORD1
+Fader	KEYWORD1
+ExecutorKnob	KEYWORD1
+CmdButton	KEYWORD1
+
+# eOS Class mebers
+update	KEYWORD2
+
+# gma3 functions
+interface	KEYWORD2
+setPrefix	KEYWORD2
+setPageName	KEYWORD2
+setFaderName	KEYWORD2
+setExecutorKnobName	KEYWORD2
+setKeyName	KEYWORD2
+send	KEYWORD2
+
+# gma3 enums and constants
+BUTTON_PRESS	LITERAL1
+BUTTON_RELEASE	LITERAL1
+FORWARD	LITERAL1
+REVERSE	LITERAL1
+FADER_UPDATE_RATE_MS	LITERAL1
+FADER_THRESHOLD	LITERAL1
