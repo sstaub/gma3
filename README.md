@@ -70,8 +70,11 @@ use ANALOG GND instead the normal GND to the center button pin (2 pins, the oute
 
 # Usage 
 
-Please refer to the GrnadMA3 manual for more information about using OSC on GrandMA3.
+Please refer to the GrandMA3 manual for more information about using OSC on GrandMA3.
 You can find general information about OSC on http://opensoundcontrol.org/introduction-osc and https://github.com/CNMAT/OSC
+
+Here an example OSC setup
+![GrandMA3 OSC Setup](https://github.com/sstaub/gma3/blob/master/images/gma3_osc_setup.png?raw=true)
 
 For use with PlatformIO https://platformio.org, as a recommanded IDE with MS VSCode, there is an extra start example folder called **gma3**.
 ![Development on PlatformIO](https://github.com/sstaub/gma3/blob/master/images/gma3_development.png?raw=true)
@@ -140,9 +143,14 @@ interface(udp, gma3IP, gma3UdpPort);
 
 # Examples
 There are some basic examples for for different board types using the Arduino IDE.
-
-## gma3
-Is a project folder for use with PlatformIO and includes the Example code as a starting point.
+- gma3_Arduino
+.ino file for Arduino boards like UNO or MEGA with an EthernetShield2
+- gma3_STM32
+.ino file for STM32-Nucleo boards with buildIn Ethernet using STM32duino
+- gma3_Teensy41
+.ino file for Teensy 4.1 board buildIn Ethernet
+- gma3_STM32_PIO
+Is a project folder for use with PlatformIO and includes the Example code for STM32-Nucleo-F767ZI as a starting point.
 
 # Helper functions
 
