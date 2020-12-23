@@ -143,13 +143,13 @@ interface(udp, gma3IP, gma3UdpPort);
 
 # Examples
 There are some basic examples for for different board types using the Arduino IDE.
-- gma3_Arduino
+- gma3_Arduino<br>
 .ino file for Arduino boards like UNO or MEGA with an EthernetShield2
-- gma3_STM32
+- gma3_STM32<br>
 .ino file for STM32-Nucleo boards with buildIn Ethernet using STM32duino
-- gma3_Teensy41
+- gma3_Teensy41<br>
 .ino file for Teensy 4.1 board buildIn Ethernet
-- gma3_STM32_PIO
+- gma3_STM32_PIO<br>
 Is a project folder for use with PlatformIO and includes the Example code for STM32-Nucleo-F767ZI as a starting point.
 
 # Helper functions
