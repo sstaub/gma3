@@ -70,7 +70,7 @@ Please refer to the GrnadMA3 manual for more information about using OSC on Gran
 You can find general information about OSC on http://opensoundcontrol.org/introduction-osc and https://github.com/CNMAT/OSC
 
 For use with PlatformIO https://platformio.org, as a recommanded IDE with MS VSCode, there is an extra start example folder called **gma3**.
-![Development on PlatformIO](../sstaub/gma3/images/gma_development.png)
+![Development on PlatformIO](</images/gma_development.png>)
 
 If you have whishes for other functions or classes enter the discussion forum. If you find bugs make an issue, nobody is perfect.
 
