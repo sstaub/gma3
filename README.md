@@ -1,5 +1,3 @@
-![](https://github.com/sstaub/gma3/blob/master/images/under_construction.gif?raw=true)
-
 # **Arduino OSC library for GrandMA3 consoles**
 An object orientated library for Arduino to control GrandMA3 consoles with OSC over Ethernet UDP. The goal of the library is to have a smart toolbox to create your own hardware which covers your needing by endless combinations of hardware elements.
 
