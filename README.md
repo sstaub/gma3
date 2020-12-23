@@ -1,3 +1,5 @@
+![](https://github.com/sstaub/gma3/blob/master/images/under_construction.gif?raw=true)
+
 # **Arduino OSC library for GrandMA3 consoles**
 An object orientated library for Arduino to control GrandMA3 consoles with OSC over Ethernet UDP. The goal of the library is to have a smart toolbox to create your own hardware which covers your needing by endless combinations of hardware elements.
 
@@ -64,13 +66,15 @@ GND to the center button pin (2 pins, the outer pin is normaly for the leveler) 
 +3.3V to the top (single pin) of the fader (100%)
 use ANALOG GND instead the normal GND to the center button pin (2 pins, the outer pin is normaly for the leveler) of the fader (0%).
 
+![Development for testing using a breadboard](https://github.com/sstaub/gma3/blob/master/images/gma3_nucleo.png?raw=true)
+
 # Usage 
 
 Please refer to the GrnadMA3 manual for more information about using OSC on GrandMA3.
 You can find general information about OSC on http://opensoundcontrol.org/introduction-osc and https://github.com/CNMAT/OSC
 
 For use with PlatformIO https://platformio.org, as a recommanded IDE with MS VSCode, there is an extra start example folder called **gma3**.
-![Development on PlatformIO](</images/gma_development.png>)
+![Development on PlatformIO](https://github.com/sstaub/gma3/blob/master/images/gma3_development.png?raw=true)
 
 If you have whishes for other functions or classes enter the discussion forum. If you find bugs make an issue, nobody is perfect.
 
