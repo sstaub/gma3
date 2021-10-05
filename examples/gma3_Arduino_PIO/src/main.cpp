@@ -1,10 +1,16 @@
-#include <LwIP.h>
-#include <STM32Ethernet.h>
-#include <EthernetUdp.h>
-#include "OSCMessage.h"
+#include "Arduino.h"
+#include <Ethernet3.h>
+#include <EthernetUdp3.h>
 #include "gma3.h"
 
+#define BTN_KEY 2
+#define ENC_1_A 3
+#define ENC_1_B 4
+#define BTN_CMD 5
+#define FADER   A0
+
 // network data
+uint8_t mac[] = {0x90, 0xA2, 0xDA, 0x10, 0x14, 0x48};
 #define GMA3_UDP_PORT  8000 // UDP Port configured in gma3
 #define GMA3_TCP_PORT  9000 // UDP Port configured in gma3
 
@@ -32,13 +38,18 @@ uint16_t qlabPort = 53000; // QLab receive port
 OscButton qlabGo(QLAB_GO_PIN , "/go", TCPSLIP);
 
 void setup() {
-	Ethernet.begin(localIP, subnet);
+	Serial.begin(9600);
+	/* for USR-ES1 module
+	Ethernet.setRstPin(9);
+	Ethernet.hardreset();
+	*/
+	Ethernet.begin(mac, localIP, subnet);
 	interfaceGMA3(gma3IP);
 	interfaceUDP(udp, gma3UdpPort);
 	interfaceTCP(tcp, gma3TcpPort);
 	interfaceExternUDP(udpQLab, qlabIP, qlabPort);
 	interfaceExternTCP(tcpQLab, qlabIP, qlabPort);
-	}
+}
 
 void loop() {
 	key201.update();
@@ -57,5 +68,5 @@ void loop() {
 		Serial.print(int2OSC());
 		Serial.print(" Float: ");
 		Serial.println(floatOSC());
-		}
 	}
+}
