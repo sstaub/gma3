@@ -14,8 +14,16 @@ An object orientated library for Arduino to control GrandMA3 consoles with OSC o
 You can import the .zip file from the IDE with *Sketch / Include Library / Add .ZIP Library...*
 3. For PlatformIO Unzip and move the folder to the lib folder of your project.
 
+# Boards
+You can use any Arduino compatible board which gives you the possibility of an ethernet port. Some boards like Teensy or STM32 Nucleo-F767ZI have an Ethernet port build in, others need an external ethernet port based e.g. on Wiznet W5500 boards like USR-ES1 or Arduino EthernetShield 2. 
+WLAN boards like ESP32 should work but are not tested and there is no guarantee for a stable connection. 
+There are also some Arduino based SPS controllers on the market which are ideal for rough enviroment using 24V.
+
+- Controllino https://www.controllino.com
+- Industrial Shields https://www.industrialshields.com
+
 # Ethernet Usage
-The in the Arduino examples used Ethernet library only supports the Wiznet 5500 chip, used on Ethernet Shield 2 or the popular USR-ES1 module which you can buy for a small pice at aliexpress.com
+The in the Arduino board example used Ethernet library only supports the Wiznet 5500 chip, used on Ethernet Shield 2 or the popular USR-ES1 module which you can buy for a small pice at aliexpress.com
 
 **Following libraries must downloaded for use with Ethernet
 !!! Beware, the Ethernet libraries have different init procedures !!!**
