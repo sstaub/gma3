@@ -163,9 +163,7 @@ uint16_t gma3UdpPort = GMA3_UDP_PORT;
 uint16_t gma3TcpPort = GMA3_TCP_PORT;
 
 EthernetUDP udp;
-EthernetUDP udpQLab;
 EthernetClient tcp;
-EthernetClient tcpQLab;
 
 // hardware definitions
 Fader fader201(FADER, 1, 201);
