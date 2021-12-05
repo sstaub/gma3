@@ -267,6 +267,16 @@ The naming must the same as in the GrandMA3 software
 #define KEY "Key"
 ```
 
+## RAM usage adjustment
+Because using strictly stack allocation of OSC strings,
+you need to adjust the allpcation size in the gma3.h file.
+```cpp
+// OSC settings
+#define OSC_PATTERN_SIZE 64 // length depends on naming conventions
+#define OSC_STRING_SIZE  64 // length depends of the command length 
+#define OSC_MESSAGE_SIZE 128 // this should OSC_PATTERN_SIZE + OSC_STRING_SIZE
+```
+
 ## Transport modes
 - **UDPOSC** standard mode using UDP protocol
 - **TCP** for OSC 1.0 supported by GrandMA3 using TCP
