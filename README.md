@@ -269,11 +269,11 @@ The naming must the same as in the GrandMA3 software
 
 ## RAM usage adjustment
 Because using strictly stack allocation of OSC strings,
-you need to adjust the allpcation size in the gma3.h file.
+you need to adjust the allocation size in the gma3.h file.
 ```cpp
 // OSC settings
 #define OSC_PATTERN_SIZE 64 // length depends on naming conventions
-#define OSC_STRING_SIZE  64 // length depends of the command length 
+#define OSC_STRING_SIZE  64 // length depends on maximum command length 
 #define OSC_MESSAGE_SIZE 128 // this should OSC_PATTERN_SIZE + OSC_STRING_SIZE
 ```
 
