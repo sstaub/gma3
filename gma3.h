@@ -37,7 +37,7 @@ Attribution-NonCommercial-ShareAlike 4.0 International
 // OSC settings
 #define OSC_PATTERN_SIZE 64
 #define OSC_STRING_SIZE  64
-#define OSC_MESSAGE_SIZE 256
+#define OSC_MESSAGE_SIZE 128
 
 // defines for TCPSLIP
 #define END     0xC0 // indicates end of packet
