@@ -21,6 +21,8 @@ uint16_t portTcpGma3;
 uint16_t portExternUdp;
 uint16_t portExternTcp;
 
+uint16_t pageGlobal = 1;
+
 void interfaceGMA3(IPAddress ip) {
 	ipGma3 = ip;
 	}
@@ -69,11 +71,9 @@ bool receiveUDP() {
 		memset(oscIn.message, 0, OSC_MESSAGE_SIZE);
 		if (size <= sizeof(oscIn.message)) {
 			udpGma3->read(oscIn.message, size);
-			if (memcmp(oscIn.message, PREFIX_PATTERN, 6) == 0) {
-				parseOSC(oscIn.message);
-				oscIn.update = true;
-				return true;
-				}
+			parseOSC(oscIn.message);
+			oscIn.update = true;
+			return true;
 			}
 		}
 	return false;
@@ -119,6 +119,19 @@ void sendExternOSC() {
 			sendExternTCP();
 			break;
 		}
+	}
+
+void command(const char cmd[], protocol_t protocol) {
+	char pattern[OSC_PATTERN_SIZE];
+	memset(pattern, 0, sizeof(pattern));
+	pattern[0] = '/';
+	if (strlen(PREFIX) != 0) {
+		strcat(pattern, PREFIX);
+		pattern[strlen(pattern)] = '/';
+		}
+	strcat(pattern, "cmd");
+	oscMessage(pattern, cmd, protocol);
+	sendOSC();
 	}
 
 void parseOSC(uint8_t *msg) {
@@ -191,24 +204,59 @@ float floatOSC() {
 	return osc.float32;
 	}
 
-Key::Key(uint8_t pin, uint16_t page, uint16_t key, protocol_t protocol) {
+void page(uint16_t page) {
+	pageGlobal = page;
+	}
+
+Button::Button(uint8_t pin, cbptr callback) {
+	this->pin = pin;
+	pinMode(pin, INPUT_PULLUP);
+	pinLast = digitalRead(pin);
+	this->callback = callback;
+	}
+
+void Button::update() {
+	if (digitalRead(pin) != pinLast) {
+		if (pinLast == false) {
+			pinLast = true; // up button release
+			}
+		else { // up button press
+			pinLast = false;
+			if (callback != nullptr) callback(); // execute callback
+			}
+		return;
+		}
+	}
+
+Key::Key(uint8_t pin, uint16_t key, protocol_t protocol) {
 	this->pin = pin;
 	pinMode(pin, INPUT_PULLUP);
 	last = digitalRead(pin);
+	this->key = key;
 	this->protocol = protocol;
-	if (strlen(PREFIX) != 0) {
-		strcat(pattern, PREFIX);
-		strcat(pattern, "/");
-		}
-	strcat(pattern, PAGE);
-	strcat(pattern, itoa(page));
-	strcat(pattern, "/");
-	strcat(pattern, KEY);
-	strcat(pattern, itoa(key));
+	}
+
+Key::~Key() {}
+
+void Key::page(uint16_t pageLocal) {
+	this->pageLocal = pageLocal;
 	}
 
 void Key::update() {
 	if ((digitalRead(pin)) != last) {
+		char pattern[OSC_PATTERN_SIZE];
+		memset(pattern, 0, sizeof(pattern));
+		pattern[0] = '/';
+		if (strlen(PREFIX) != 0) {
+			strcat(pattern, PREFIX);
+			pattern[strlen(pattern)] = '/';
+			}
+		strcat(pattern, PAGE);
+		if (pageLocal > 0) strcat(pattern, itoa(pageLocal));
+		else strcat(pattern, itoa(pageGlobal));
+		pattern[strlen(pattern)] = '/';
+		strcat(pattern, KEY);
+		strcat(pattern, itoa(key));
 		if (last == LOW) {
 			last = HIGH;
 			oscMessage(pattern, BUTTON_RELEASE, protocol);
@@ -221,20 +269,39 @@ void Key::update() {
 		} 
 	}
 
-Fader::Fader(uint8_t analogPin, uint16_t page, uint16_t fader, protocol_t protocol) {
+Fader::Fader(uint8_t analogPin, uint16_t fader, protocol_t protocol) {
 	this->analogPin = analogPin;
+	this->fader = fader;
 	this->protocol = protocol;
-	if (strlen(PREFIX) != 0) {
-		strcat(pattern, PREFIX);
-		strcat(pattern, "/");
-		}
-	strcat(pattern, PAGE);
-	strcat(pattern, itoa(page));
-	strcat(pattern, "/");
-	strcat(pattern, FADER);
-	strcat(pattern, itoa(fader));
 	analogLast = 0xFFFF; // forces an osc output of the fader
 	updateTime = millis();
+	}
+
+Fader::~Fader() {}
+
+void Fader::page(uint16_t pageLocal) {
+	this->pageLocal = pageLocal;
+	}
+
+int32_t Fader::value() {
+	return valueLast;
+	}
+
+void Fader::fetch(int16_t value) {
+	fetchValue = value;
+	lockState = true;
+	}
+
+void Fader::jitter(uint8_t delta) {
+	this->delta = delta;
+	}
+
+bool Fader::lock() {
+	return lockState;
+	}
+
+void Fader::lock(bool state) {
+	lockState = state;
 	}
 
 void Fader::update() {
@@ -246,30 +313,46 @@ void Fader::update() {
   	  int32_t value = map(analogLast, 8, 1015, 0, 100); // convert to 0...100
   	  if (valueLast != value) {
   	    valueLast = value;
-				oscMessage(pattern, value, protocol);
-				sendOSC();
+				if (lockState == true) {
+					if ((valueLast <= fetchValue + delta) && (valueLast >= fetchValue - delta)) lockState = false; 
+					}
+				if (lockState == false) {
+					char pattern[OSC_PATTERN_SIZE];
+					memset(pattern, 0, sizeof(pattern));
+					pattern[0] = '/';
+					if (strlen(PREFIX) != 0) {
+						strcat(pattern, PREFIX);
+						pattern[strlen(pattern)] = '/';
+						}
+					strcat(pattern, PAGE);
+					if (pageLocal > 0) strcat(pattern, itoa(pageLocal));
+					else strcat(pattern, itoa(pageGlobal));
+					pattern[strlen(pattern)] = '/';
+					strcat(pattern, FADER);
+					strcat(pattern, itoa(fader));
+					oscMessage(pattern, value, protocol);
+					sendOSC();
+					}
   	  	}
 			}
 		updateTime = millis();
 		}	
 	}
 
-ExecutorKnob::ExecutorKnob(uint8_t pinA, uint8_t pinB, uint16_t page, uint16_t executorKnob, protocol_t protocol, uint8_t direction) {
+ExecutorKnob::ExecutorKnob(uint8_t pinA, uint8_t pinB, uint16_t executorKnob, protocol_t protocol, uint8_t direction) {
 	this->pinA = pinA;
 	this->pinB = pinB;
 	this->direction = direction;
 	pinMode(pinA, INPUT_PULLUP);
 	pinMode(pinB, INPUT_PULLUP);
+	this->executorKnob = executorKnob;
 	this->protocol = protocol;
-	if (strlen(PREFIX) != 0) {
-		strcat(pattern, PREFIX);
-		strcat(pattern, "/");
-		}
-	strcat(pattern, PAGE);
-	strcat(pattern, itoa(page));
-	strcat(pattern, "/");
-	strcat(pattern, EXECUTOR_KNOB);
-	strcat(pattern, itoa(executorKnob));
+	}
+
+ExecutorKnob::~ExecutorKnob() {}
+
+void ExecutorKnob::page(uint16_t pageLocal) {
+	this->pageLocal = pageLocal;
 	}
 
 void ExecutorKnob::update() {
@@ -286,11 +369,23 @@ void ExecutorKnob::update() {
 		}
 	pinALast = pinACurrent;
 	if (encoderMotion != 0) {
+		char pattern[OSC_PATTERN_SIZE];
+		memset(pattern, 0, sizeof(pattern));
+		pattern[0] = '/';
+		if (strlen(PREFIX) != 0) {
+			strcat(pattern, PREFIX);
+			pattern[strlen(pattern)] = '/';
+			}
+		strcat(pattern, PAGE);
+		if (pageLocal > 0) strcat(pattern, itoa(pageLocal));
+		else strcat(pattern, itoa(pageGlobal));
+		pattern[strlen(pattern)] = '/';
+		strcat(pattern, EXECUTOR_KNOB);
+		strcat(pattern, itoa(executorKnob));
 		oscMessage(pattern, (int32_t)encoderMotion, protocol);
 		sendOSC();
 		}
 	}
-
 
 CmdButton::CmdButton(uint8_t pin, const char command[], protocol_t protocol) {
 	this->pin = pin;
@@ -304,6 +399,8 @@ CmdButton::CmdButton(uint8_t pin, const char command[], protocol_t protocol) {
 	strcat(pattern, "cmd");
 	strncpy(cmdString, command, OSC_STRING_SIZE - 1);
 	}
+
+CmdButton::~CmdButton() {}
 
 void CmdButton::update() {
 	if ((digitalRead(pin)) != last) {
@@ -358,10 +455,12 @@ OscButton::OscButton(uint8_t pin, const char pattern[], protocol_t protocol) {
 	this->protocol = protocol;
 	pinMode(pin, INPUT_PULLUP);
 	last = digitalRead(pin);
-	typ = NONE;
+	typ = NODATA;
 	memset(patternString, 0, sizeof(patternString));
 	strcpy(patternString, pattern);
 	}
+
+OscButton::~OscButton() {}
 
 void OscButton::update() {
 	if ((digitalRead(pin)) != last) {
@@ -390,7 +489,7 @@ void OscButton::update() {
 				case STRING:
 					oscMessage(patternString, messageString, protocol);
 					break;
-				case NONE:
+				case NODATA:
 					oscMessage(patternString, protocol);
 					break;
 				}
@@ -569,8 +668,8 @@ void itoh(uint8_t *msg, uint8_t dataStart, int32_t value) {
 	msg[dataStart + 3] = int32Array[0];
 	}	
 
-const char* itoa(int number) {
-	static char numstring[12];
-	sprintf(numstring, "%d", number);
+const char* itoa(int32_t number) {
+	static char numstring[16];
+	sprintf(numstring, "%ld", number);
 	return numstring;
 	}

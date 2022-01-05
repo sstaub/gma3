@@ -4,8 +4,14 @@ Fader	KEYWORD1
 ExecutorKnob	KEYWORD1
 CmdButton	KEYWORD1
 OscButton	KEYWORD1
+Button	KEYWORD1
 
 # gma3 Class mebers
+page	KEYWORD2
+value	KEYWORD2
+fetch	KEYWORD2
+jitter	KEYWORD2
+lock	KEYWORD2
 update	KEYWORD2
 
 # gma3 functions
@@ -19,6 +25,8 @@ sendExternUDP	KEYWORD2
 receiveUDP	KEYWORD2
 sendTCP	KEYWORD2
 sendExternTCP	KEYWORD2
+page	KEYWORD2
+command	KEYWORD2
 parseOSC	KEYWORD2
 patternOSC	KEYWORD2
 stringOSC	KEYWORD2
@@ -32,7 +40,6 @@ ftoh	KEYWORD2
 htoi	KEYWORD2
 itoh	KEYWORD2
 itoa	KEYWORD2
-
 
 # gma3 enums and constants
 BUTTON_PRESS	LITERAL1

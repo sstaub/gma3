@@ -20,9 +20,9 @@ EthernetClient tcp;
 EthernetClient tcpQLab;
 
 // hardware definitions
-Fader fader201(FADER, 1, 201);
-Key key201(BTN_KEY, 1, 201, TCP);
-ExecutorKnob enc301(ENC_1_A, ENC_1_B, 1, 301);
+Fader fader201(FADER, 201);
+Key key201(BTN_KEY, 201, TCP);
+ExecutorKnob enc301(ENC_1_A, ENC_1_B, 301);
 CmdButton macro1(BTN_CMD, "GO+ Macro 1", TCP);
 
 // use of generic OSC button

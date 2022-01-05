@@ -1,17 +1,13 @@
+// simple example for paging and fetching
+
 #include "Arduino.h"
 #include "Ethernet3.h"
 #include "gma3.h"
 
 // constants and macros
-
-#define BTN_1       2 // GO button
-#define BTN_2       3 // Macro button
-#define BTN_3       4 // page up button
-#define BTN_4       5	// page down button
-#define BTN_5       6 // QLab GO button
-#define ENC_1_A     7 // encoder A
-#define ENC_1_B     8 // encoder B
-#define FADER_1     A0 // fader
+#define BTN_1   2
+#define BTN_2   3
+#define FADER_1 A0
 
 // Network config
 #define GMA3_UDP_PORT 8000 // UDP Port configured in gma3
@@ -34,11 +30,7 @@ EthernetClient tcpQLab;
 int pageNumber = 1;
 int16_t value[PAGES];
 
-// hardware definitions
-Key key201(BTN_1, 201, TCP);
 Fader fader201(FADER_1, 201);
-ExecutorKnob enc301(ENC_1_A, ENC_1_B, 301, UDPOSC, REVERSE);
-CmdButton macro1(BTN_2, "GO+ Macro 1");
 
 void upButton() {
 	if (fader201.lock() == false)
@@ -72,13 +64,9 @@ void downButton() {
 	Serial.println(pageNumber);
 	}
 
-Button pageUp(BTN_3, upButton);
-Button pageDown(BTN_4, downButton);
-
-// use of generic OSC button
-IPAddress qlabIP(10, 101, 1, 100); // IP of QLab
-uint16_t qlabPort = 53000; // QLab receive port
-OscButton qlabGo(BTN_5 , "/go");
+// add Up / Down keys
+Button pageUp(BTN_1, upButton);
+Button pageDown(BTN_2, downButton);
 
 void setup() {
 	pinMode(LED_BUILTIN, OUTPUT);
@@ -87,32 +75,12 @@ void setup() {
 	interfaceGMA3(gma3IP);
 	interfaceUDP(udp, gma3UdpPort);
 	interfaceTCP(tcp, gma3TcpPort);
-	interfaceExternUDP(udpQLab, qlabIP, qlabPort);
-	interfaceExternTCP(tcpQLab, qlabIP, qlabPort);
-	fader201.fetch(0);
+	fader201.fetch(0); // force fader to 0
 	}
 
 void loop() {
+	fader201.update();
 	pageUp.update();
 	pageDown.update();
-	if (receiveUDP()) {
-		Serial.print("OSC Pattern: ");
-		Serial.print(patternOSC());
-		Serial.print(" String: ");
-		Serial.print(stringOSC());
-		Serial.print(" Integer 1: ");
-		Serial.print(int1OSC());
-		Serial.print(" Integer 2: ");
-		Serial.print(int2OSC());
-		Serial.print(" Float: ");
-		Serial.println(floatOSC());
-		}
-
-	key201.update();
-	fader201.update();
-	enc301.update();
-	macro1.update();
-	qlabGo.update();
-
-	digitalWrite(LED_BUILTIN, fader201.lock());
+	digitalWrite(LED_BUILTIN, fader201.lock()); // shows if fader is locked
 	}
