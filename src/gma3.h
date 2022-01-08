@@ -204,12 +204,10 @@ void page(uint16_t page);
 class Button {
 	public:
 		/**
-		 * @brief construct a new Button object
+		 * @brief Construct a new Button object
 		 * 
-		 * @param pinUp button to trigger up callback
-		 * @param pinDown button to trigger down callback
-		 * @param callbackUp pointer to the calback for button up
-		 * @param callbackDown pointer to the calback for button down
+		 * @param pin button to trigger up callback
+		 * @param callback pointer to the calback for the button
 		 */
 		Button(uint8_t pin, cbptr callback);
 

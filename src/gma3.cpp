@@ -218,9 +218,9 @@ Button::Button(uint8_t pin, cbptr callback) {
 void Button::update() {
 	if (digitalRead(pin) != pinLast) {
 		if (pinLast == false) {
-			pinLast = true; // up button release
+			pinLast = true; // button release
 			}
-		else { // up button press
+		else { // button press
 			pinLast = false;
 			if (callback != nullptr) callback(); // execute callback
 			}
