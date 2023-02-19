@@ -9,7 +9,7 @@ An object orientated library for Arduino to control GrandMA3 consoles with OSC o
 
 ### Changes for v2
 - TCP support
-- UDP parser for echo replays to get usefull informations, e.g. fader value ...
+- UDP parser for echo replays to get useful informations, e.g. fader value ...
 - independent from the CNNMAT OSC library
 - change of naming conventions
 - change license to CC BY-NC-SA 4.0
@@ -21,9 +21,9 @@ You can import the .zip file from the IDE with *Sketch / Include Library / Add .
 3. For PlatformIO Unzip and move the folder to the lib folder of your project.
 
 ## Boards
-You can use any Arduino compatible board which gives you the possibility of an ethernet port. Some boards like Teensy or STM32 Nucleo-F767ZI have an Ethernet port build in, others need an external ethernet port based e.g. on Wiznet W5500 boards like USR-ES1 or Arduino EthernetShield 2. 
+You can use any Arduino compatible board which gives you the possibility of an ethernet port. Some boards like Teensy or STM32 Nucleo-F767ZI have an Ethernet port build in, others need an external ethernet port based e.g. on WIZnet W5500 boards like USR-ES1 or Arduino EthernetShield 2. 
 WLAN boards like ESP32 should work but are not tested and there is no guarantee for a stable connection. 
-There are also some Arduino based SPS controllers on the market which are ideal for rough enviroment using 24V.
+There are also some Arduino based SPS controllers on the market which are ideal for rough environment using 24V.
 
 - Controllino https://www.controllino.com
 - Industrial Shields https://www.industrialshields.com
@@ -38,7 +38,7 @@ The in the Arduino board example used Ethernet library only supports the Wiznet 
 - an Arduino compatible Ethernet library like Ethernet3 https://github.com/sstaub/Ethernet3
 - optional for Teensy MAC address https://github.com/sstaub/TeensyID
 
-**Teensy 4.1 with buildin Ethernet**
+**Teensy 4.1 with build-in Ethernet**
 - https://github.com/vjmuzik/NativeEthernet
 - https://github.com/vjmuzik/FNET
 
@@ -50,16 +50,16 @@ The in the Arduino board example used Ethernet library only supports the Wiznet 
 The library support hardware elements like encoders, faders, buttons with some helper functions. The library allows you to use hardware elements as an object and with the use of the helper functions, code becomes much easier to write and read and to understand.
 - **Buttons**
 	You can use every momentary push button on the market, e.g. MX Keys which are also used by MA Lighting, the keys are available with different push characters and have therefore different color markers. One pin must connect to a Digital Pin D*n* the other to ground.<br>
-	**! A 100nF capitor is recommanded between the button pins !**<br>
+	**! A 100nF capacitor is recommended between the button pins !**<br>
 - **Faders**
-  Recommanded are linear faders with 10k Ohm from **Bourns** or **ALPS** which are available in different lengths and qualities.<br>
+  Recommended are linear faders with 10k Ohm from **Bourns** or **ALPS** which are available in different lengths and qualities.<br>
 	Beware that ARM boards like STM32-Nucleo use 3.3V, classic AVR boards like Arduino UNO use 5V. The leveler must connect to the Analog Pin A*n*. The other pins must connect to ground and 3.3V or 5V.<br>
-	**! A 10nF capitor is recommanded between leveler and ground !**<br>
+	**! A 10nF capacitor is recommended between leveler and ground !**<br>
 
 - **Rotary Encoders**
   You can use encoders from **ALPS** or equivalent.
 	The middle pin of the encoders must connect to ground, the both other pins A/B must connect to Digital Pins D*n*.<br>
-  **! Two 100nF capitors are recommanded between the button pin A/B and ground !**<br>
+  **! Two 100nF capacitors are recommended between the button pin A/B and ground !**<br>
 
 ### Additional Advices for Analog Pins
 The most problems comes from bad grounding and cables that are to long,
@@ -67,28 +67,28 @@ on PCB's the shielding design is very important.
 
 - **Arduino UNO, MEGA with WIZnet5500**
 Use AREF Pin instead +5V to the top (single pin) of the fader (100%).
-Use GND next to AREF and connect to the center button pin (2 pins, the outer pin is normaly for the leveler) of the fader (0%)
+Use GND next to AREF and connect to the center button pin (2 pins, the outer pin is normally for the leveler) of the fader (0%)
 
 - **STM32-Nucleo**
 use IOREF Pin instead +3.3V to the top (single pin) of the fader (100%).
-GND to the center button pin (2 pins, the outer pin is normaly for the leveler) of the fader (0%).
+GND to the center button pin (2 pins, the outer pin is normally for the leveler) of the fader (0%).
 
 - **TEENSY 3.x with WIZnet5500**
 +3.3V to the top (single pin) of the fader (100%)
-use ANALOG GND instead the normal GND to the center button pin (2 pins, the outer pin is normaly for the leveler) of the fader (0%).
+use ANALOG GND instead the normal GND to the center button pin (2 pins, the outer pin is normally for the leveler) of the fader (0%).
 
-![Development for testing using a breadboard](https://github.com/sstaub/gma3/blob/master/images/gma3_teensy41.png?raw=true)
-Test configuartion with Teensy41
+![Development for testing using a breadboard](https://github.com/sstaub/gma3/blob/main/images/gma3_teensy41.png?raw=true)
+Test configuration with Teensy41
 
 ## Usage 
 You can find general information about OSC on http://opensoundcontrol.org/
 Please refer to the GrandMA3 manual for more information about using OSC on GrandMA3.
 
 Here an example OSC setup in the GrandMA3 software
-![GrandMA3 OSC Setup](https://github.com/sstaub/gma3/blob/master/images/gma3_osc_setup.png?raw=true)
+![GrandMA3 OSC Setup](https://github.com/sstaub/gma3/blob/main/images/gma3_osc_setup.png?raw=true)
 
-For use with PlatformIO https://platformio.org, as a recommanded IDE with MS VSCode, there is an extra start example folder called **gma3_Arduino_PIO**, you must add the needed libraries manually.
-![Development on PlatformIO](https://github.com/sstaub/gma3/blob/master/images/gma3_development.png?raw=true)
+For use with PlatformIO https://platformio.org, as a recommended IDE with MS VSCode, there is an extra start example folder called **gma3_Arduino_PIO**, you must add the needed libraries manually.
+![Development on PlatformIO](https://github.com/sstaub/gma3/blob/main/images/gma3_development.png?raw=true)
 
 If you have wishes for other functions or classes enter the discussion forum. If you find bugs make an issue, nobody is perfect.
 
@@ -122,7 +122,7 @@ Before using Ethernet there a some things that must be done. It can be different
 - **mac** - You need a unique MAC address, for Teensy 3.x / 4.1 you can use the TeensyID library on this GitHub site, for STM32-Nucleo there is a build in MAC address
 - **localIP** - You need a static IP address for your Arduino in the subnet range of network system
 - **subnet** - A subnet range is necessary
-- **localPort** - This is the destinitaion port of your Arduino
+- **localPort** - This is the destination port of your Arduino
 - **gma3IP** - This is the GrandMA3 console IP address
 - **gma3Port** - This is the destination port of the GrandMA3 console
 
@@ -207,7 +207,7 @@ void loop() {
 
 ### Examples folders
 There are some basic examples for for different board types using the Arduino IDE.
-Also a new example for the Selction class with an Up / Down button for page change and fetching.
+Also a new example for the Selection class with an Up / Down button for page change and fetching.
 
 ### gma3_Arduino_PIO
 Is a project folder for use with PlatformIO and includes an example code for an Arduino MEGA as a starting point. It also include an extra button for a GO command to QLab.
@@ -293,7 +293,7 @@ interfaceExternTCP(tcpQLab, qlabIP, qlabPort);
 ```
 
 ## Page Number
-You can change the Page number now global or laocal.
+You can change the Page number now global or local.
 
 ### Global Page Number
 For changing the global page number use
@@ -304,7 +304,7 @@ Standard is **Page 1**
 
 Example
 ```cpp
-page(2); // set glabal page to 2
+page(2); // set global page to 2
 ```
 
 ### Local Page Number
@@ -387,7 +387,7 @@ Fader(uint8_t analogPin, uint16_t fader, protocol_t protocol = UDPOSC);
 ```
 - ```analogPin``` are the connection Analog Pin for the fader leveler
 - ```fader``` is the fader number of the executors, refer to the GrandMA3 manual
-- ```protocol``` is the transport the protocol you want to use, it can UDPOSC and TCP, UDPOSC is recommanded
+- ```protocol``` is the transport the protocol you want to use, it can UDPOSC and TCP, UDPOSC is recommended
 
 Example, this should done before the setup()
 ```cpp
@@ -528,7 +528,7 @@ enc301.update();
 ```
 
 ## **CmdButton**
-With this class you can create Keya button which allows to send commands to the console.
+With this class you can create a button which allows to send commands to the console.
 ```cpp
 CmdButton(uint8_t pin, const char command[], protocol_t protocol = UDPOSC);
 ```
@@ -560,8 +560,8 @@ macro1.update();
 ```
 
 ## **OscButton**
-With this class you can create generic buttons which allows you to control other OSC compatible software in the network like QLab. The class initializer is overloaded to allow sending different OSC data types: Interger 32 bit, Float, Strings or no data.<br>
-**! When using interger or float, 0 or 0.0 is explicit send when releasing the button !**
+With this class you can create generic buttons which allows you to control other OSC compatible software in the network like QLab. The class initializer is overloaded to allow sending different OSC data types: Integer 32 bit, Float, Strings or no data.<br>
+**! When using integer or float, 0 or 0.0 is explicit send when releasing the button !**
 
 ### Constructor
 ```cpp
@@ -665,13 +665,13 @@ void oscMessage(const char pattern[], const char string[], protocol_t protocol =
 void oscMessage(const char pattern[], protocol_t protocol = UDPOSC);
 ```
 - ```const char pattern[]``` is the OSC pattern 
-- ```int32_t int32``` for interger data
+- ```int32_t int32``` for integer data
 - ```float float32``` for float date
 - ```const char string[]``` for strings
 - it is also possible to send no argument, e.g. for QLab Go cmd
 - ```protocol_t protocol``` is the protocol type UDPOSC, TCP or TCPSLIP
 
-1. Send an OSC Message, depending on the choosen interface.
+1. Send an OSC Message, depending on the chosen interface.
 This functions can called inside setup() or loop() after init the interface.
 ```cpp
 void sendUDP();
@@ -716,10 +716,10 @@ if (receiveUDP()) {
 	}
 ```
 
-Exapmle Outputs are
+Example Outputs are
 ```
 OSC Pattern: /gma3/13.13.1.5.2 String: Go+ Integer 1: 1 Integer 2: 0 Float: 0.00
 OSC Pattern: /gma3/13.13.1.5.2 String: Go+ Integer 1: 0 Integer 2: 0 Float: 0.00
 OSC Pattern: /gma3/13.13.1.5.2 String: FaderMaster Integer 1: 1 Integer 2: 0 Float: 100.00
 ```
-The OSC pattern data is very cryptic because of the representation of the internal structure which there is no real docuentation.
+The OSC pattern data is very cryptic because of the representation of the internal structure which there is no real documentation.
