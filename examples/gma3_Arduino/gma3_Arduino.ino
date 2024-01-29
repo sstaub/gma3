@@ -1,71 +1,83 @@
-#include <Ethernet3.h>
-#include <EthernetUdp3.h>
+// Example for Arduino with Ethernetshield 2 
+
+#include <Ethernet.h> // for Arduino Ethernet library  https://github.com/arduino-libraries/Ethernet
+// #include <Ethernet3.h> // for Ethernet3 library https://github.com/sstaub/Ethernet3
+// #include <EthernetUdp3.h>
 #include "gma3.h"
 
-#define BTN_KEY 2
-#define ENC_1_A 3
-#define ENC_1_B 4
-#define BTN_CMD 5
-#define FADER   A0
+// I/O config
+#define BTN_KEY_1 2
+#define BTN_KEY_2 3
+#define BTN_KEY_3 4
+#define BTN_KEY_4 5
+#define ENC_1_A   6
+#define ENC_1_B   7
+#define ENC_2_A   8
+#define ENC_2_B   9
+#define BTN_CMD   10
+#define FADER     A0
 
-// network data
+// Network config
+#define GMA3_UDP_PORT 8000 // UDP Port configured in gma3
+#define GMA3_TCP_PORT 9000 // UDP Port configured in gma3
+
 uint8_t mac[] = {0x90, 0xA2, 0xDA, 0x10, 0x14, 0x48};
-#define GMA3_UDP_PORT  8000 // UDP Port configured in gma3
-#define GMA3_TCP_PORT  9000 // UDP Port configured in gma3
-
-IPAddress localIP(10, 101, 1, 201); // IP address of the microcontroller board
-IPAddress subnet(255, 255, 0, 0); // subnet range
+IPAddress localIp(10, 101, 1, 201); // IP address of the microcontroller board
+IPAddress subnet(255, 255, 0, 0); // optional subnet range
+IPAddress dns(10, 101, 1, 100); // optional DNS address of your device
+IPAddress gateway(10, 101, 1, 100); // optional Gateway address of your device
+uint16_t localUdpPort = GMA3_UDP_PORT;
 IPAddress gma3IP(10, 101, 1, 100); // IP address of the gma3 console
 uint16_t gma3UdpPort = GMA3_UDP_PORT;
 uint16_t gma3TcpPort = GMA3_TCP_PORT;
 
-EthernetUDP udp;
-EthernetUDP udpQLab;
-EthernetClient tcp;
-EthernetClient tcpQLab;
+// EthernetUDP udp; // for UDP
+EthernetClient tcp; // for TCP
+
+// functions prototypes
+void parse();
 
 // hardware definitions
+Key key101(BTN_KEY_1, 101);
 Fader fader201(FADER, 201);
-Key key201(BTN_KEY, 201, TCP);
+Key key201(BTN_KEY_2, 201);
+Key key301(BTN_KEY_3, 301);
 ExecutorKnob enc301(ENC_1_A, ENC_1_B, 301);
-CmdButton macro1(BTN_CMD, "GO+ Macro 1", TCP);
-
-// use of generic OSC button
-#define QLAB_GO_PIN 6
-IPAddress qlabIP(10, 101, 1, 100); // IP of QLab
-uint16_t qlabPort = 53000; // QLab receive port
-OscButton qlabGo(QLAB_GO_PIN , "/go", TCPSLIP);
+Key key401(BTN_KEY_4, 401);
+ExecutorKnob enc401(ENC_2_A, ENC_2_B, 301);
+CmdButton macro1(BTN_CMD, "GO+ Macro 1");
+Parser parser(parse);
 
 void setup() {
 	Serial.begin(9600);
-	/* for USR-ES1 module
-	Ethernet.setRstPin(9);
-	Ethernet.hardreset();
-	*/
-	Ethernet.begin(mac, localIP, subnet);
-	interfaceGMA3(gma3IP);
-	interfaceUDP(udp, gma3UdpPort);
-	interfaceTCP(tcp, gma3TcpPort);
-	interfaceExternUDP(udpQLab, qlabIP, qlabPort);
-	interfaceExternTCP(tcpQLab, qlabIP, qlabPort);
+	Ethernet.begin(mac, localIp);
+	//interface(udp, gma3IP, gma3UdpPort); // for UDP
+	interface(tcp, TCP, gma3IP, gma3TcpPort); // for TCP
 	}
 
 void loop() {
+	key101.update();
 	key201.update();
+	key301.update();
+	key401.update();
 	fader201.update();
 	enc301.update();
+	enc401.update();
 	macro1.update();
-	qlabGo.update();
-	if (receiveUDP()) {
-		Serial.print("OSC Pattern: ");
-		Serial.print(patternOSC());
-		Serial.print(" String: ");
-		Serial.print(stringOSC());
-		Serial.print(" Integer 1: ");
-		Serial.print(int1OSC());
-		Serial.print(" Integer 2: ");
-		Serial.print(int2OSC());
-		Serial.print(" Float: ");
-		Serial.println(floatOSC());
-		}
+	parser.update();
+	}
+
+void parse() {
+	Serial.print("OSC Message at ");
+	Serial.print(millis());
+	Serial.print("ms Pattern: ");
+	Serial.print(parser.patternOSC());
+	Serial.print(" String: ");
+	Serial.print(parser.stringOSC());
+	Serial.print(" Integer 1: ");
+	Serial.print(parser.int1OSC());
+	Serial.print(" Integer 2: ");
+	Serial.print(parser.int2OSC());
+	Serial.print(" Float: ");
+	Serial.println(parser.floatOSC());
 	}

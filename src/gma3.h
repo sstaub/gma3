@@ -1,5 +1,5 @@
 /*
-gma3 for GrandMa3 consoles by Stefan Staub (c) 2021 is licensed under CC BY-NC-SA 4.0
+gma3 for GrandMa3 consoles by Stefan Staub (c) 2023 is licensed under CC BY-NC-SA 4.0
 Attribution-NonCommercial-ShareAlike 4.0 International
 */
 
@@ -7,12 +7,14 @@ Attribution-NonCommercial-ShareAlike 4.0 International
  * @brief hardware sugestions
  * - fader is a linear type with 10kOhm, from Bourns or ALPS and can be 60/80/100mm long
  * - put a 10nF ceramic capitors between GND and fader leveler to prevent analog noise
- * - Arduino UNO, MEGA:
+ * - Arduino UNO, MEGA
  *   use AREF instead +5V to the top (single pin) of the fader (100%), use the GND next to AREF
  *   GND to the center button pin (2 pins, the outer pin is normaly for the leveler) of the fader (0%)
- * - TEENSY 3.x:
+ * - TEENSY 3.x
  *   use ANALOG GND instead of the normal GND
- * - put 100nF ceramic capitors between ground and the input of the buttons and ecoders
+ * - STM32
+ *   use AGND and AVDD
+ * - put 100nF ceramic capitors between ground and the inputs of the buttons and ecoders
  */
 
 #ifndef GMA3_H
@@ -22,7 +24,7 @@ Attribution-NonCommercial-ShareAlike 4.0 International
 #include "Udp.h"
 #include "Client.h"
 
-// callback
+// callback type
 typedef void (*cbptr)();
 
 // button values
@@ -34,8 +36,8 @@ typedef void (*cbptr)();
 #define REVERSE 1
 
 // fader settings
-#define FADER_UPDATE_RATE_MS  1 // update rate, must low at possible for fetching
-#define FADER_THRESHOLD       4 // Jitter threshold of the faders
+#define FADER_UPDATE_RATE_MS  40 // update rate, must low at possible for fetching
+#define FADER_THRESHOLD       2 // Jitter threshold of the faders
 
 // OSC settings
 #define NAME_LENGTH_MAX  32
@@ -49,13 +51,6 @@ typedef void (*cbptr)();
 #define ESC_END 0xDC // ESC ESC_END means END data byte
 #define ESC_ESC 0xDD // ESC ESC_ESC means ESC data byte
 
-// GMA3 naming conventions
-#define PREFIX "gma3"
-#define PAGE "Page"
-#define FADER "Fader"
-#define EXECUTOR_KNOB "Encoder"
-#define KEY "Key"
-
 /**
  * @brief Network protocol type and coding
  * 
@@ -63,7 +58,6 @@ typedef void (*cbptr)();
 typedef enum ProtocolType {
 	UDPOSC,
 	TCP,
-	TCPSLIP,
 	} protocol_t;
 
 /**
@@ -77,14 +71,19 @@ typedef enum OscType {
 	STRING,
 	} osc_t;
 
+typedef enum SendMode {
+	GLOBAL,
+	CONSOLE,
+	LOCAL,
+	} send_t;
+
 struct Message {
 	uint8_t message[OSC_MESSAGE_SIZE];
 	int32_t size;
 	protocol_t protocol;
-	bool update;
 	};
 
-struct OSC {
+struct Data {
 	char pattern[OSC_PATTERN_SIZE];
 	char tag[12];
 	char string[OSC_STRING_SIZE];
@@ -93,134 +92,294 @@ struct OSC {
 	};
 
 /**
- * @brief Set GMA3 IP address
+ * @brief set the Prefix name
  * 
- * @param gma3IP GMA3 console IP address
+ * @param prefix 
  */
-void interfaceGMA3(IPAddress ip);
+void prefixName(const char *prefix);
 
 /**
- * @brief Set UDP interface
+ * @brief set the DataPool name
  * 
- * @param gma3Udp UDP interface
- * @param gma3UdpPort UDP port off GrandMA3, standard port is 8000
+ * @param pool 
  */
-void interfaceUDP(UDP &udp, uint16_t port = 8000);
+void dataPoolName(const char *pool);
 
 /**
- * @brief Set TCP interface
+ * @brief set the Page name
  * 
- * @param tcp TCP interface
- * @param eosTcpPort TCP port off GrandMA3, standard port is 9000
+ * @param page 
  */
-void interfaceTCP(Client &tcp, uint16_t port = 9000);
+void pageName(const char *page);
+
+/**
+ * @brief set the Fader name
+ * 
+ * @param fader 
+ */
+void faderName(const char *fader);
+
+/**
+ * @brief set the ExecutorKnob name
+ * 
+ * @param executorKnob 
+ */
+void executorKnobName(const char *executorKnob);
+
+/**
+ * @brief set the Key name
+ * 
+ * @param key 
+ */
+void keyName(const char *key);
 
 /**
  * @brief Set UDP interface
  * 
  * @param udp UDP interface
- * @param ip IP address of the receiver
- * @param port UDP port of the receiver
+ * @param ip GMA3 console IP address
+ * @param port UDP port off GrandMA3, standard port is 8000
  */
-void interfaceExternUDP(UDP &udp, IPAddress ip, uint16_t port);
+void interface(UDP &udp, IPAddress ip, uint16_t port = 8000);
 
 /**
  * @brief Set TCP interface
  * 
  * @param tcp TCP interface
- * @param ip IP address of the receiver
- * @param port TCP port of the receiver
+ * @param protocol_t protocol only TCP is possible in the moment
+ * @param ip GMA3 console IP address
+ * @param port TCP port off GrandMA3, standard port is 9000
  */
-void interfaceExternTCP(Client &tcp, IPAddress ip, uint16_t port);
-
-/**
- * @brief Send an OSC message via UDP to gma3 or external receiver
- * 
- */
-void sendUDP();
-void sendExternUDP();
-
-/**
- * @brief Receive an OSC message via UDP
- * 
- * @return true if there is an OSC message received
- * @return false 
- */
-bool receiveUDP();
-
-/**
- * @brief Send an OSC message via TCP to gma3 or external receiver
- * 
- */
-void sendTCP();
-void sendExternTCP();
+void interface(Client &tcp, protocol_t protocol, IPAddress ip, uint16_t port = 9000);
 
 /**
  * @brief Send OSC data to gma3 or external receiver
  * 
  */
 void sendOSC();
-void sendExternOSC();
-
-void command(const char cmd[], protocol_t protocol = UDPOSC);
 
 /**
- * @brief Parse the oscmessage
- * following assumtions
+ * @brief Send a command to the console
+ * 
+ * @param cmd 
+ */
+void command(const char cmd[]);
+
+/**
+ * @brief Get the common DataPool number
+ * 
+ * @return uint16_t common DataPool number
+ */
+uint16_t commonPool();
+
+/**
+ * @brief Set the common DataPool number
+ * 
+ * @param pool DataPool number
+ */
+void commonPool(uint16_t pool);
+
+/**
+ * @brief Get the common Page number
+ * 
+ * @return uint16_t common page number
+ */
+uint16_t commonPage();
+
+/**
+ * @brief Set the common Page number
+ * 
+ * @param page page number
+ */
+void commonPage(uint16_t page);
+
+/**
+ * @brief Parser object to handle messages from the console
+ * * following assumtions
  * - the gma3 osc message could contains 1 string, max. 2 integer and 1 float
  * - the first item can only be a type of string
  * - the second item can only be a type of integer
  * - the third item can be a type of integer or float
- * @param msg OSC message
  */
-void parseOSC(uint8_t *msg);
-
-/**
- * @brief Return the parser results
- * 
- * @return const char* OSC pattern
- * @return const char* OSC tag string
- * @return const char* string argument
- * @return int32_t the two integer arguments
- * @return float the float argument used for fader level
- */
-const char* patternOSC();
-const char* stringOSC();
-int32_t int1OSC();
-int32_t int2OSC();
-float floatOSC();
-
-/**
- * @brief Set the global page number
- * 
- * @param page 
- */
-void page(uint16_t page);
-
-/**
- * @brief Button object
- * 
- */
-class Button {
+class Parser {
 	public:
 		/**
-		 * @brief Construct a new Button object
+		 * @brief 
 		 * 
-		 * @param pin button to trigger up callback
-		 * @param callback pointer to the calback for the button
+		 * @param callback function callback
 		 */
-		Button(uint8_t pin, cbptr callback);
+		Parser(cbptr callback = nullptr);
 
 		/**
-		 * @brief Check for updated selection
+		 * @brief Return the dataPool pattern send by the console
 		 * 
+		 * @return const char* dataPool pattern
 		 */
+		const char* patternOSC();
+
+		/**
+		 * @brief Parse for dataPool level
+		 * 
+		 * @param level 0 - 4, root is 0
+		 * @return uint8_t 
+		 */
+		int dataStructure(uint8_t level);
+
+		/**
+		 * @brief Return the string argument send by the console
+		 * 
+		 * @return const char* 
+		 */
+		const char* stringOSC();
+
+		/**
+		 * @brief Return the first interger argument send by the console
+		 * 
+		 * @return int32_t 
+		 */
+		int32_t int1OSC();
+
+		/**
+		 * @brief Return the second interger argument send by the console
+		 * 
+		 * @return int32_t 
+		 */
+		int32_t int2OSC();
+
+		/**
+		 * @brief Return the float argument send by the console
+		 * 
+		 * @return float 
+		 */
+		float floatOSC();
+
 		void update();
 
 	private:
-		uint8_t pin;
-		uint8_t pinLast;
+		void parseOSC();
+		bool receiveUDP();
+		bool receiveTCP();
+		int dataValue[5];
 		cbptr callback = nullptr;
+		struct Data receiveData;
+	};
+
+/**
+ * @brief Pools object to handle DataPools via buttons 
+ * allows to step through an defined amount of data pools
+ * 
+ */
+class Pools {
+	public:
+		/**
+		 * @brief Construct a new Pools object with warp around functionality
+		 * 
+		 * @param pinUp pin of the up button, not needed for virtual devices
+		 * @param pinDown pin of the down button, not needed for virtual devices
+		 * @param poolsStart number of the first pool you want to use
+		 * @param poolsEnd number of the last pool you want to use
+		 * @param mode this can send the pool number to the console, for internal use or both
+		 * - CONSOLE for use only with the console
+		 * - LOCAL for local use 
+		 * - GLOBAL both internal and console
+		 * @param callback  function to call when pool change
+		 */
+		Pools(uint8_t pinUp, uint8_t pinDown, uint8_t poolsStart, uint8_t poolsEnd, send_t mode = GLOBAL, cbptr callback = nullptr);
+		Pools(uint8_t poolsStart, uint8_t poolsEnd, send_t mode = GLOBAL, cbptr callback = nullptr);
+
+		/**
+		 * @brief Get the current common pool number
+		 * 
+		 * @return uint16_t pool number
+		 */
+		uint16_t currentPool();
+
+		/**
+		 * @brief Get the last common pool number
+		 * 
+		 * @return uint16_t pool number
+		 */
+		uint16_t lastPool();
+
+		/**
+		 * @brief Update the output of the pool buttons, must be in loop()
+		 * 
+		 * @param stateUp optional for virtual devices, TRUE if button press
+		 * @param stateDown optional for virtual devices, TRUE if button press
+		 */
+		void update();
+		void update(bool stateUp, bool stateDown);
+
+	private:
+		void sendPool(uint16_t pool);
+		uint8_t pinUp;
+		uint8_t pinUpLast;
+		uint8_t pinDown;
+		uint8_t pinDownLast;
+		uint16_t poolsStart;
+		uint16_t poolsEnd;
+		uint16_t poolNumber = 1;
+		uint16_t poolLast;
+		send_t mode;
+		cbptr callback;
+	};
+
+/**
+ * @brief Pools object to handle DataPools via buttons
+ * 
+ */
+class Pages {
+	public:
+		/**
+		 * @brief Construct a new pages object
+		 * 
+		 * @param pinUp pin of the up button, not needed for virtual devices
+		 * @param pinDown pin of the down button, not needed for virtual devices
+		 * @param poolsStart number of the first pool you want to use
+		 * @param poolsEnd number of the last pool you want to use
+		 * @param mode this can send the pool number to the console, for internal use or both
+		 * - CONSOLE for use only with the console
+		 * - LOCAL for local use 
+		 * - GLOBAL both internal and console
+		 * @param callback function to call when page change
+		 */
+		Pages(uint8_t pinUp, uint8_t pinDown, uint8_t pagesStart, uint8_t pagesEnd, send_t mode = GLOBAL, cbptr callback = nullptr);
+		Pages(uint8_t pagesStart, uint8_t pagesEnd, send_t mode = GLOBAL, cbptr callback = nullptr);
+
+		/**
+		 * @brief Get the current common page number
+		 * 
+		 * @return uint16_t page number
+		 */
+		uint16_t currentPage();
+
+		/**
+		 * @brief Get the last common page number
+		 * 
+		 * @return uint16_t page number
+		 */
+		uint16_t lastPage();
+
+		/**
+		 * @brief Update the output of the pool buttons, must be in loop()
+		 * 
+		 * @param stateUp optional for virtual devices, TRUE if button press
+		 * @param stateDown optional for virtual devices, TRUE if button press
+		 */
+		void update();
+		void update(bool stateUp, bool stateDown);
+	private:
+		void sendPage(uint16_t page);
+		uint8_t pinUp;
+		uint8_t pinUpLast;
+		uint8_t pinDown;
+		uint8_t pinDownLast;
+		uint16_t pagesStart;
+		uint16_t pagesEnd;
+		uint16_t pageNumber = 1;
+		uint16_t pageLast;
+		send_t mode;
+		cbptr callback;
 	};
 
 /**
@@ -232,37 +391,40 @@ class Key {
 		/**
 		 * @brief Construct a new Key object
 		 * 
-		 * @param pin button pin
-		 * @param page number of the page
+		 * @param pin button pin, not needed for virtual devices
 		 * @param key number of the executor button
 		 */
-		Key(uint8_t pin, uint16_t key, protocol_t protocol = UDPOSC);
+		Key(uint8_t pin, uint16_t key);
+		Key(uint16_t key);
 
 		/**
-		 * @brief Destroy the Key object
+		 * @brief Set a local pool number
 		 * 
+		 * @param page number must between 1 and 9999, if 0 common pool number is used
 		 */
-		~Key();
+		void pool(uint16_t poolLocal = 0);
 
 		/**
 		 * @brief set a local page number
 		 * 
-		 * @param page number must between 1 and 9999, if 0 glaobal page number is used
+		 * @param page number must between 1 and 9999, if 0 common page number is used
 		 */
 		void page(uint16_t pageLocal = 0);
 
 		/**
 		 * @brief Update the state of the Key button, must in loop()
 		 * 
+		 * @param state optional for virtual devices, TRUE if button press
 		 */
 		void update();
+		void update(bool state);
 
 	private:
   	uint8_t pin;
-		protocol_t protocol;
+		uint8_t last;
 		uint16_t key;
+		uint16_t poolLocal = 0;
 		uint16_t pageLocal = 0;
-  	uint8_t last;
 	};
 
 /**
@@ -274,17 +436,18 @@ class Fader {
 		/**
 		 * @brief Construct a new Fader object
 		 * 
-		 * @param analogPin pin for the fader leveler
-		 * @param pageNumber number of the page
+		 * @param analogPin pin for the fader leveler, not needed for virtual devices
 		 * @param faderNumber number of the executor fader
 		 */
-		Fader(uint8_t analogPin, uint16_t fader, protocol_t protocol = UDPOSC);
+		Fader(uint8_t analogPin, uint16_t fader);
+		Fader(uint16_t fader);
 
 		/**
-		 * @brief Destroy the Fader object
+		 * @brief Set a local pool number
 		 * 
+		 * @param page number must between 1 and 9999, if 0 common pool number is used
 		 */
-		~Fader();
+		void pool(uint16_t poolLocal = 0);
 
 		/**
 		 * @brief Set a local page number
@@ -331,21 +494,24 @@ class Fader {
 
 		/**
 		 * @brief Update the state of the fader, must in loop()
+		 * @brief For use with virtual inputs:
 		 * 
+		 * @param value optional for virtual inputs with 10 bits
 		 */
 		void update();
+		void update(uint16_t value);
 
 	private:
+		bool lockState = false;
 		uint8_t analogPin;
+		uint8_t delta;
 		uint16_t fader;
+		int16_t poolLocal = 0;
 		uint16_t pageLocal = 0;
-		protocol_t protocol;
+		int16_t fetchValue;
 		int16_t analogLast;
 		int32_t valueLast;
 		uint32_t updateTime;
-		bool lockState = false;
-		int16_t fetchValue;
-		uint8_t delta;
 	};
 
 /**
@@ -357,44 +523,48 @@ class ExecutorKnob {
 		/**
 		 * @brief Construct a new ExecutorKnob object
 		 * 
-		 * @param pinA pin A of the encoder
-		 * @param pinB pin B of the encoder
-		 * @param pageNumber number of the page
+		 * @param pinA pin A of the encoder, not needed for virtual devices
+		 * @param pinB pin B of the encoder, not needed for virtual devices
 	 	 * @param executorKnobNumber number of the executorKnob
 		 * @param direction the direction for the encoder, can be FORWARD or REVERSE, depends on hardware alignment
 		 */
-		ExecutorKnob(uint8_t pinA, uint8_t pinB, uint16_t executorKnob, protocol_t protocol = UDPOSC, uint8_t direction = FORWARD);
+		ExecutorKnob(uint8_t pinA, uint8_t pinB, uint16_t executorKnob, uint8_t direction = FORWARD);
+		ExecutorKnob(uint16_t executorKnob, uint8_t direction = FORWARD);
 
 		/**
-		 * @brief Destroy the Executor Knob object
+		 * @brief Set a local pool number
 		 * 
+		 * @param page number must between 1 and 9999, if 0 common pool number is used
 		 */
-		~ExecutorKnob();
+		void pool(uint16_t poolLocal = 0);
 
 		/**
 		 * @brief Set a local page number
 		 * 
-		 * @param page number must between 1 and 9999, if 0 glaobal page number is used
+		 * @param page number must between 1 and 9999, if 0 common page number is used
 		 */
 		void page(uint16_t pageLocal = 0);
 
 		/**
 		 * @brief Update the output of the executorKnob, must be in loop()
 		 * 
+		 * @param stateA optional for virtual devices, TRUE if button press
+		 * @param stateB optional for virtual devices, TRUE if button press
 		 */
 		void update();
+		void update(uint8_t stateA, uint8_t stateB);
 	
 	private:
 		uint8_t pinA;
 		uint8_t pinB;
-		uint16_t executorKnob;
-		uint16_t pageLocal = 0;
-		protocol_t protocol;
 		uint8_t pinALast;
 		uint8_t pinACurrent;
 		uint8_t direction;
-		int8_t encoderMotion;
 		uint8_t value;
+		int8_t encoderMotion;
+		uint16_t executorKnob;
+		uint16_t poolLocal = 0;
+		uint16_t pageLocal = 0;
 	};
 
 /**
@@ -406,109 +576,36 @@ class CmdButton {
 		/**
 		 * @brief Construct a new CmdButton object
 		 * 
-		 * @param pin button pin
-		 * @param cmdPattern command string
+		 * @param pin button pin, not needed for virtual devices
+		 * @param command command string
 		 */
-		CmdButton(uint8_t pin, const char command[], protocol_t protocol = UDPOSC);
-
-		/**
-		 * @brief Destroy the Cmd Button object
-		 * 
-		 */
-		~CmdButton();
+		CmdButton(uint8_t pin, const char *command);
+		CmdButton(const char *command);
 
 		/**
 		 * @brief Update the state of the cmdButton, must in loop()
 		 * 
+		 * @param state optional for virtual devices, TRUE if button press
 		 */
 		void update();
+		void update(bool state);
 
 	private:
-		char cmdString[OSC_STRING_SIZE];
-		protocol_t protocol;
-		char pattern[OSC_PATTERN_SIZE] = "/";
-  	uint8_t pin;
-  	uint8_t last;
-	};
-
-class OscButton {
-	public:
-	/**
-	 * @brief Construct a new osc Button object for sending an integer value
-	 * 
-	 * @param pin button pin
-	 * @param pattern OSC address
-	 * @param integer32 value must cast (int32_t) when using with a non matching size
-	 */
-	OscButton(uint8_t pin, const char pattern[], int32_t integer32, protocol_t protocol = UDPOSC);
-	
-	/**
-	 * @brief Construct a new osc Button object for sending a float value
-	 * 
-	 * @param pin button pin
-	 * @param pattern OSC address
-	 * @param float32 float value
-	 */
-	OscButton(uint8_t pin, const char pattern[], float float32, protocol_t protocol = UDPOSC);
-	
-	/**
-	 * @brief Construct a new osc Button object for sending a string
-	 * 
-	 * @param pin button pin
-	 * @param pattern OSC address
-	 * @param message message string
-	 */
-	OscButton(uint8_t pin, const char pattern[], const char message[], protocol_t protocol = UDPOSC);
-	
-	/**
-	 * @brief Construct a new osc Button object with no value
-	 * 
-	 * @param pin button pin
-	 * @param pattern OSC address
-	 */
-	OscButton(uint8_t pin, const char pattern[], protocol_t protocol = UDPOSC);
-
-	/**
-	 * @brief Destroy the Osc Button object
-	 * 
-	 */
-	~OscButton();
-
-	/**
-	 * @brief Update the state of the OSC button, must in loop()
-	 * 
-	 */
-	void update();
-
-	private:
-		enum osc_t {NODATA, INT32, FLOAT32, STRING};
-		osc_t typ;
-		char patternString[OSC_PATTERN_SIZE];
-		int32_t integer32;
-		float float32;
-		char messageString[OSC_STRING_SIZE];
-		protocol_t protocol;
 		uint8_t pin;
-    uint8_t last;
+  	uint8_t last;
+		char cmdString[OSC_STRING_SIZE];
 	};
 
 /**
- * @brief Creates osc messages with different data types
+ * @brief Creates osc messages with different data types and send it
  * 
  * @param osc message
  * @param value integer32, float, string value and nodata argument
- * @param protocol type of the used protocol, UDP, TCP or TCPSLIP
  */
-void oscMessage(const char pattern[], int32_t int32, protocol_t protocol = UDPOSC);
-void oscMessage(const char pattern[], float float32, protocol_t protocol = UDPOSC);
-void oscMessage(const char pattern[], const char string[], protocol_t protocol = UDPOSC);
-void oscMessage(const char pattern[], protocol_t protocol = UDPOSC);
-
-/**
- * @brief Encode TCPSLIP messages for external OSC buttons
- * 
- */
-void slipEncode();
+void oscMessage(const char pattern[], int32_t int32);
+void oscMessage(const char pattern[], float float32);
+void oscMessage(const char pattern[], const char string[]);
+void oscMessage(const char pattern[]);
 
 /**
  * @brief Big endian array to float conversation

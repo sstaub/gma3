@@ -1,162 +1,193 @@
 #include "gma3.h"
 
 // internal structs
-struct Message oscIn, oscOut;
-struct OSC osc;
+struct Message receiveMessage, sendMessage;
 
-// network IP addresses
+// network IP address
 IPAddress ipGma3;
-IPAddress ipExternUdp;
-IPAddress ipExternTcp;
 
 // network sockets
 UDP *udpGma3;
-UDP *udpExtern;
 Client *tcpGma3;
-Client *tcpExtern;
 
 // network ports
 uint16_t portUdpGma3;
 uint16_t portTcpGma3;
-uint16_t portExternUdp;
-uint16_t portExternTcp;
 
-uint16_t pageGlobal = 1;
+// global variables
+uint16_t pageCommon = 1;
+uint16_t poolCommon = 1;
+char namePrefix[NAME_LENGTH_MAX] = "gma3";
+char namePrefixSearch[NAME_LENGTH_MAX] = "/gma3/";
+char namePool[NAME_LENGTH_MAX] = "DataPool"; // Page name
+char namePage[NAME_LENGTH_MAX] = "Page"; // Page name
+char nameFader[NAME_LENGTH_MAX] = "Fader"; // Fader name
+char nameExecutorKnob[NAME_LENGTH_MAX] = "Encoder"; // ExecutorKnob name
+char nameKey[NAME_LENGTH_MAX] = "Key"; // Key name
 
-void interfaceGMA3(IPAddress ip) {
-	ipGma3 = ip;
+void prefixName(const char *prefix) {
+	memset(namePrefix, 0, NAME_LENGTH_MAX);
+	strcpy(namePrefix, prefix);
+	memset(namePrefixSearch, 0, NAME_LENGTH_MAX);
+	if (strlen(prefix) != 0) {
+		strcpy(namePrefixSearch, "/");
+		strcat(namePrefixSearch, prefix);
+		strcat(namePrefixSearch, "/");
+		}
 	}
 
-void interfaceUDP(UDP &udp, uint16_t port) {
+void dataPoolName(const char *pool) {
+	memset(namePool, 0, NAME_LENGTH_MAX);
+	strcpy(namePool, pool);
+	}
+
+void pageName(const char *page) {
+	memset(namePage, 0, NAME_LENGTH_MAX);
+	strcpy(namePage, page);
+	}
+
+void faderName(const char *fader) {
+	memset(nameFader, 0, NAME_LENGTH_MAX);
+	strcpy(nameFader, fader);
+	}
+
+void executorKnobName(const char *executorKnob) {
+	memset(nameExecutorKnob, 0, NAME_LENGTH_MAX);
+	strcpy(nameExecutorKnob, executorKnob);
+	}
+
+void keyName(const char *key) {
+	memset(nameKey, 0, NAME_LENGTH_MAX);
+	strcpy(nameKey, key);
+	}
+
+void interface(UDP &udp, IPAddress ip, uint16_t port) {
+	ipGma3 = ip;
 	udpGma3 = &udp;
 	portUdpGma3 = port;
+	sendMessage.protocol = UDPOSC;
+	receiveMessage.protocol = UDPOSC;
 	udpGma3->begin(port);
 	}
 
-void interfaceTCP(Client &tcp, uint16_t port) {
+void interface(Client &tcp, protocol_t protocol, IPAddress ip, uint16_t port) {
+	ipGma3 = ip;
 	tcpGma3 = &tcp;
 	portTcpGma3 = port;
+	sendMessage.protocol = TCP;
+	receiveMessage.protocol = TCP;
 	tcpGma3->connect(ipGma3, port);
 	}
 
-void interfaceExternUDP(UDP &udp, IPAddress ip, uint16_t port) {
-	udpExtern = &udp;
-	ipExternUdp = ip;
-	portExternUdp = port;
-	}
-
-void interfaceExternTCP(Client &tcp, IPAddress ip, uint16_t port) {
-	tcpExtern = &tcp;
-	ipExternTcp = ip;
-	portExternTcp = port;
-	tcpExtern->connect(ip, port);
-	}
-
-void sendUDP() {
-	udpGma3->beginPacket(ipGma3 ,portUdpGma3);
-	udpGma3->write(oscOut.message, oscOut.size);
-	udpGma3->endPacket();
-	}
-
-void sendExternUDP() {
-	udpExtern->beginPacket(ipExternUdp ,portExternUdp);
-	udpExtern->write(oscOut.message, oscOut.size);
-	udpExtern->endPacket();
-	}
-
-bool receiveUDP() {
-	size_t size = udpGma3->parsePacket();
-	if (size > 0) {
-		oscIn.size = size;
-		memset(oscIn.message, 0, OSC_MESSAGE_SIZE);
-		if (size <= sizeof(oscIn.message)) {
-			udpGma3->read(oscIn.message, size);
-			parseOSC(oscIn.message);
-			oscIn.update = true;
-			return true;
-			}
-		}
-	return false;
-	}
-
-void sendTCP() {
-	if (!tcpGma3->connected()) {
-		tcpGma3->connect(ipGma3, portTcpGma3);
-		}
-	tcpGma3->write(oscOut.message, oscOut.size);
-	}
-
-void sendExternTCP() {
-	if (!tcpExtern->connected()) {
-		tcpExtern->connect(ipExternTcp, portExternTcp);
-		}
-	tcpExtern->write(oscOut.message, oscOut.size);
-	}
-
 void sendOSC() {
-	switch (oscOut.protocol) {
+	switch (sendMessage.protocol) {
 		case UDPOSC:
-			sendUDP();
+			udpGma3->beginPacket(ipGma3, portUdpGma3);
+			udpGma3->write(sendMessage.message, sendMessage.size);
+			udpGma3->endPacket();
 			break;
 		case TCP:
-			sendTCP();
-			break;
-		case TCPSLIP:
-			sendTCP();
+			if (!tcpGma3->connected()) tcpGma3->connect(ipGma3, portTcpGma3);
+			tcpGma3->write(sendMessage.message, sendMessage.size);
 			break;
 		}
 	}
 
-void sendExternOSC() {
-	switch (oscOut.protocol) {
-		case UDPOSC:
-			sendExternUDP();
-			break;
-		case TCP:
-			sendExternTCP();
-			break;
-		case TCPSLIP:
-			sendExternTCP();
-			break;
-		}
-	}
-
-void command(const char cmd[], protocol_t protocol) {
+void command(const char cmd[]) {
 	char pattern[OSC_PATTERN_SIZE];
 	memset(pattern, 0, sizeof(pattern));
 	pattern[0] = '/';
-	if (strlen(PREFIX) != 0) {
-		strcat(pattern, PREFIX);
+	if (strlen(namePrefix) != 0) {
+		strcat(pattern, namePrefix);
 		pattern[strlen(pattern)] = '/';
 		}
 	strcat(pattern, "cmd");
-	oscMessage(pattern, cmd, protocol);
-	sendOSC();
+	oscMessage(pattern, cmd);
 	}
 
-void parseOSC(uint8_t *msg) {
-	memset(osc.pattern, 0, sizeof(osc.pattern));
-	memset(osc.tag, 0, sizeof(osc.tag));
-	memset(osc.string, 0, sizeof(osc.string)); // what happens with to string
-	*osc.int32 = 0;
-	osc.float32 = 0.0f;
+uint16_t commonPool() {
+	return poolCommon;
+	}
+
+void commonPool(uint16_t pool) {
+	poolCommon = pool;
+	}
+
+uint16_t commonPage() {
+	return pageCommon;
+	}
+
+void commonPage(uint16_t page) {
+	pageCommon = page;
+	}
+
+Parser::Parser(cbptr callback) {
+	this->callback = callback;
+	}
+
+const char* Parser::patternOSC() {
+	return receiveData.pattern + strlen(namePrefixSearch);
+	}
+
+int Parser::dataStructure(uint8_t level) {
+	if (level < 5) return dataValue[level];
+	return 0;
+	}
+
+const char* Parser::stringOSC() {
+	return receiveData.string;
+	}
+
+int32_t Parser::int1OSC() {
+	return receiveData.int32[0];
+	}
+
+int32_t Parser::int2OSC() {
+	return receiveData.int32[1];
+	}
+
+float Parser::floatOSC() {
+	return receiveData.float32;
+	}
+
+void Parser::update() {
+	if(receiveMessage.protocol == UDPOSC) {
+		if(receiveUDP()) {
+			if (callback != nullptr) callback();
+			return;
+			}
+		}
+	if(receiveMessage.protocol == TCP) {
+		if(receiveTCP()) {
+			if (callback != nullptr) callback();
+			}
+		}
+	}
+
+void Parser::parseOSC() {
+	memset(receiveData.pattern, 0, sizeof(receiveData.pattern));
+	memset(receiveData.tag, 0, sizeof(receiveData.tag));
+	memset(receiveData.string, 0, sizeof(receiveData.string)); // what happens with to string
+	*receiveData.int32 = 0;
+	receiveData.float32 = 0.0f;
 	int dataStart;
-	strncpy(osc.pattern, (char*)msg, sizeof(osc.pattern) - 1);
-	int patternSize = strlen(osc.pattern);
+	strncpy(receiveData.pattern, (char*)receiveMessage.message, sizeof(receiveData.pattern) - 1);
+	sscanf(receiveData.pattern + strlen(namePrefixSearch), "%d.%d.%d.%d.%d", &dataValue[0], &dataValue[1], &dataValue[2], &dataValue[3], &dataValue[4]);
+	int patternSize = strlen(receiveData.pattern);
 	int patternOffset = patternSize % 4;
 	int tagStart;
 	if (patternOffset == 0) tagStart = patternSize + 4;
 	else tagStart = patternSize + (4 - patternOffset);
-	strncpy(osc.tag, (char*)msg + tagStart, sizeof(osc.tag) - 1);
-	int tagSize = strlen(osc.tag); // including ','
+	strncpy(receiveData.tag, (char*)receiveMessage.message + tagStart, sizeof(receiveData.tag) - 1);
+	int tagSize = strlen(receiveData.tag); // including ','
 	int tagOffset = tagSize % 4;
 	if (tagOffset == 0) dataStart = tagSize + 4 + tagStart;
 	else dataStart = tagSize + (4 - tagOffset) + tagStart;
 	
-	if (osc.tag[1] != 0) {
-		if (osc.tag[1] == 's') {
-			strncpy(osc.string, (char*)msg + dataStart, sizeof(osc.string) - 1);
-			int stringSize = strlen(osc.string);
+	if (receiveData.tag[1] != 0) {
+		if (receiveData.tag[1] == 's') {
+			strncpy(receiveData.string, (char*)receiveMessage.message + dataStart, sizeof(receiveData.string) - 1);
+			int stringSize = strlen(receiveData.string);
 			int stringOffset = stringSize % 4;
 			if (stringOffset == 0) dataStart = dataStart + stringSize + 4;
 			else dataStart = dataStart + stringSize + (4 - stringOffset);
@@ -164,79 +195,282 @@ void parseOSC(uint8_t *msg) {
 		}
 	else return;
 	
-	if (osc.tag[2] != 0) {
-		if (osc.tag[2] == 'i') {
-			osc.int32[0] = htoi(msg, dataStart);
+	if (receiveData.tag[2] != 0) {
+		if (receiveData.tag[2] == 'i') {
+			receiveData.int32[0] = htoi(receiveMessage.message, dataStart);
 			dataStart = dataStart + 4;
 			}
 		}
 	else return;
 
-	if (osc.tag[3] != 0) {
-		if (osc.tag[3] == 'i') {
-			osc.int32[1] = htoi(msg, dataStart);
+	if (receiveData.tag[3] != 0) {
+		if (receiveData.tag[3] == 'i') {
+			receiveData.int32[1] = htoi(receiveMessage.message, dataStart);
 			dataStart = dataStart + 4;
 			}
-		else if (osc.tag[3] == 'f') {
-			osc.float32 = htof(msg, dataStart);
+		else if (receiveData.tag[3] == 'f') {
+			receiveData.float32 = htof(receiveMessage.message, dataStart);
 			dataStart = dataStart + 4;
 			}
 		}
 	}
 
-const char* patternOSC() {
-	return osc.pattern;
+bool Parser::receiveUDP() {
+	size_t size = udpGma3->parsePacket();
+	if (size > 0) {
+		receiveMessage.size = size;
+		memset(receiveMessage.message, 0, OSC_MESSAGE_SIZE);
+		if (size <= sizeof(receiveMessage.message)) {
+			udpGma3->read(receiveMessage.message, size);
+			if (strlen(namePrefix) != 0) {
+				if (memcmp(receiveMessage.message, namePrefixSearch, strlen(namePrefixSearch)) != 0) return false;
+				}
+			parseOSC();
+			return true;
+			}
+		}
+	return false;
 	}
 
-const char* stringOSC() {
-	return osc.string;
+bool Parser::receiveTCP() {
+	size_t size = tcpGma3->available();
+	if (size > 0) {
+		receiveMessage.size = size;
+		memset(receiveMessage.message, 0, OSC_MESSAGE_SIZE);
+		if (size <= sizeof(receiveMessage.message)) {
+			tcpGma3->read(receiveMessage.message, size);
+			if (strlen(namePrefix) != 0) {
+				if (memcmp(receiveMessage.message, namePrefixSearch, strlen(namePrefixSearch)) != 0) return false;
+				}
+			parseOSC();
+			return true;
+			}
+		}
+	return false;
 	}
 
-int32_t int1OSC() {
-	return osc.int32[0];
-	}
-
-int32_t int2OSC() {
-	return osc.int32[1];
-	}
-
-float floatOSC() {
-	return osc.float32;
-	}
-
-void page(uint16_t page) {
-	pageGlobal = page;
-	}
-
-Button::Button(uint8_t pin, cbptr callback) {
-	this->pin = pin;
-	pinMode(pin, INPUT_PULLUP);
-	pinLast = digitalRead(pin);
+Pools::Pools(uint8_t pinUp, uint8_t pinDown, uint8_t poolsStart, uint8_t poolsEnd, send_t mode, cbptr callback) {
+	this->pinUp = pinUp;
+	pinMode(pinUp, INPUT_PULLUP);
+	pinUpLast = digitalRead(pinUp);
+	this->pinDown = pinDown;
+	pinMode(pinDown, INPUT_PULLUP);
+	pinDownLast = digitalRead(pinDown);
+	this->poolsStart = poolsStart;
+	this->poolsEnd = poolsEnd;
 	this->callback = callback;
+	this->mode = mode;
+	poolNumber = poolsStart;
+	poolCommon = poolsStart;
 	}
 
-void Button::update() {
-	if (digitalRead(pin) != pinLast) {
-		if (pinLast == false) {
-			pinLast = true; // button release
+Pools::Pools(uint8_t poolsStart, uint8_t poolsEnd, send_t mode, cbptr callback) {
+	this->poolsStart = poolsStart;
+	this->poolsEnd = poolsEnd;
+	this->callback = callback;
+	this->mode = mode;
+	poolNumber = poolsStart;
+	poolCommon = poolsStart;
+	}
+
+uint16_t Pools::currentPool() {
+	return poolCommon;
+	}
+
+uint16_t Pools::lastPool() {
+	return poolLast;
+	}
+
+void Pools::update() {
+	if (digitalRead(pinUp) != pinUpLast) {
+		if (pinUpLast == false) {
+			pinUpLast = true; // button release
 			}
 		else { // button press
-			pinLast = false;
+			pinUpLast = false;
+			poolLast = poolNumber;
+			if (poolNumber >= poolsEnd) poolNumber = poolsStart; // rollover to first page
+			else poolNumber++;
+			if(mode == GLOBAL || mode == CONSOLE) sendPool(poolNumber);
+			poolCommon = poolNumber;
+			if (callback != nullptr) callback(); // execute callback
+			}
+		return;
+		}
+	if (digitalRead(pinDown) != pinDownLast) {
+		if (pinDownLast == false) {
+			pinDownLast = true; // button release
+			}
+		else { // button press
+			pinDownLast = false;
+			poolLast = poolNumber;
+			if (poolNumber <= poolsStart) poolNumber = poolsEnd; // rollover to last page
+			else poolNumber--;
+			if(mode == GLOBAL || mode == CONSOLE) sendPool(poolNumber);
+			poolCommon = poolNumber;
 			if (callback != nullptr) callback(); // execute callback
 			}
 		return;
 		}
 	}
 
-Key::Key(uint8_t pin, uint16_t key, protocol_t protocol) {
-	this->pin = pin;
-	pinMode(pin, INPUT_PULLUP);
-	last = digitalRead(pin);
-	this->key = key;
-	this->protocol = protocol;
+void Pools::update(bool stateUp, bool stateDown) {
+	if (stateUp != pinUpLast) {
+		if (pinUpLast == false) {
+			pinUpLast = true; // button press
+			poolLast = poolNumber;
+			if (poolNumber >= poolsEnd) poolNumber = poolsStart; // rollover to first page
+			else poolNumber++;
+			if(mode == GLOBAL || mode == CONSOLE) sendPool(poolNumber);
+			poolCommon = poolNumber;
+			if (callback != nullptr) callback(); // execute callback
+			}
+		else { // button release
+			pinUpLast = false;
+			}
+		return;
+		}
+	if (stateDown != pinDownLast) {
+		if (pinDownLast == false) {
+			pinDownLast = true; // button press
+			poolLast = poolNumber;
+			if (poolNumber <= poolsStart) poolNumber = poolsEnd; // rollover to last page
+			else poolNumber--;
+			if(mode == GLOBAL || mode == CONSOLE) sendPool(poolNumber);
+			poolCommon = poolNumber;
+			if (callback != nullptr) callback(); // execute callback
+			}
+		else { // button release
+			pinDownLast = false;
+			}
+		return;
+		}
 	}
 
-Key::~Key() {}
+void Pools::sendPool(uint16_t pool) {
+	char cmd[12] = "dataPool ";
+	strcat(cmd, itoa(pool));
+	command(cmd);
+	}
+
+Pages::Pages(uint8_t pinUp, uint8_t pinDown, uint8_t pagesStart, uint8_t pagesEnd, send_t mode, cbptr callback) {
+	this->pinUp = pinUp;
+	pinMode(pinUp, INPUT_PULLUP);
+	pinUpLast = digitalRead(pinUp);
+	this->pinDown = pinDown;
+	pinMode(pinDown, INPUT_PULLUP);
+	pinDownLast = digitalRead(pinDown);
+	this->pagesStart = pagesStart;
+	this->pagesEnd = pagesEnd;
+	this->mode = mode;
+	this->callback = callback;
+	pageLast = pagesStart;
+	pageCommon = pagesStart;
+	}
+
+Pages::Pages(uint8_t pagesStart, uint8_t pagesEnd, send_t mode, cbptr callback) {
+	this->pagesStart = pagesStart;
+	this->pagesEnd = pagesEnd;
+	this->mode = mode;
+	this->callback = callback;
+	pageLast = pagesStart;
+	pageCommon = pagesStart;
+	}
+
+uint16_t Pages::currentPage() {
+	return pageCommon;
+	}
+
+uint16_t Pages::lastPage() {
+	return pageLast;
+	}
+
+void Pages::update() {
+	if (digitalRead(pinUp) != pinUpLast) {
+		if (pinUpLast == false) {
+			pinUpLast = true; // button release
+			}
+		else { // button press
+			pinUpLast = false;
+			pageLast = pageNumber;
+			if (pageNumber >= pagesEnd) pageNumber = pagesStart; // rollover to first page
+			else pageNumber++;
+			if(mode == GLOBAL || mode == CONSOLE) sendPage(pageNumber);
+			pageCommon = pageNumber;
+			if (callback != nullptr) callback(); // execute callback
+			}
+		return;
+		}
+	if (digitalRead(pinDown) != pinDownLast) {
+		if (pinDownLast == false) {
+			pinDownLast = true; // button release
+			}
+		else { // button press
+			pinDownLast = false;
+			pageLast = pageNumber;
+			if (pageNumber <= pagesStart) pageNumber = pagesEnd; // rollover to last page
+			else pageNumber--;
+			if(mode == GLOBAL || mode == CONSOLE) sendPage(pageNumber);
+			pageCommon = pageNumber;
+			if (callback != nullptr) callback(); // execute callback
+			}
+		return;
+		}
+	}
+
+void Pages::update(bool stateUp, bool stateDown) {
+	if (stateUp != pinUpLast) {
+		if (pinUpLast == false) {
+			pinUpLast = true; // button press
+			pageLast = pageNumber;
+			if (pageNumber >= pagesEnd) pageNumber = pagesStart; // rollover to first page
+			else pageNumber++;
+			if(mode == GLOBAL || mode == CONSOLE) sendPage(pageNumber);
+			pageCommon = pageNumber;
+			if (callback != nullptr) callback(); // execute callback
+			}
+		else { // button release
+			pinUpLast = false;
+			}
+		return;
+		}
+	if (stateDown != pinDownLast) {
+		if (pinDownLast == false) {
+			pinDownLast = true; // button press
+			pageLast = pageNumber;
+			if (pageNumber <= pagesStart) pageNumber = pagesEnd; // rollover to last page
+			else pageNumber--;
+			if(mode == GLOBAL || mode == CONSOLE) sendPage(pageNumber);
+			pageCommon = pageNumber;
+			if (callback != nullptr) callback(); // execute callback
+			}
+		else { // button release
+			pinDownLast = false;
+			}
+		return;
+		}
+	}
+
+void Pages::sendPage(uint16_t page) {
+	char cmd[12] = "Page ";
+	strcat(cmd, itoa(page));
+	command(cmd);
+	}
+
+Key::Key(uint8_t pin, uint16_t key) {
+	this->pin = pin;
+	pinMode(pin, INPUT_PULLUP);
+	last = HIGH;
+	this->key = key;
+	}
+
+Key::Key(uint16_t key) {
+	this->key = key;
+	}
+
+void Key::pool(uint16_t poolLocal) {
+	this->poolLocal = poolLocal;
+	}
 
 void Key::page(uint16_t pageLocal) {
 	this->pageLocal = pageLocal;
@@ -247,37 +481,85 @@ void Key::update() {
 		char pattern[OSC_PATTERN_SIZE];
 		memset(pattern, 0, sizeof(pattern));
 		pattern[0] = '/';
-		if (strlen(PREFIX) != 0) {
-			strcat(pattern, PREFIX);
+		if (strlen(namePrefix)) {
+			strcat(pattern, namePrefix);
 			pattern[strlen(pattern)] = '/';
 			}
-		strcat(pattern, PAGE);
-		if (pageLocal > 0) strcat(pattern, itoa(pageLocal));
-		else strcat(pattern, itoa(pageGlobal));
-		pattern[strlen(pattern)] = '/';
-		strcat(pattern, KEY);
+		if(strlen(namePool)) {
+			strcat(pattern, namePool);
+			if (poolLocal > 0) strcat(pattern, itoa(poolLocal));
+			else strcat(pattern, itoa(poolCommon));
+			pattern[strlen(pattern)] = '/';
+			}
+		if(strlen(namePage)) {
+			strcat(pattern, namePage);
+			if (pageLocal > 0) strcat(pattern, itoa(pageLocal));
+			else strcat(pattern, itoa(pageCommon));
+			pattern[strlen(pattern)] = '/';
+			}
+		strcat(pattern, nameKey);
 		strcat(pattern, itoa(key));
 		if (last == LOW) {
 			last = HIGH;
-			oscMessage(pattern, BUTTON_RELEASE, protocol);
+			oscMessage(pattern, BUTTON_RELEASE);
 			}
 		else {
 			last = LOW;
-			oscMessage(pattern, BUTTON_PRESS, protocol);
+			oscMessage(pattern, BUTTON_PRESS);
 			}
-		sendOSC();
 		} 
 	}
 
-Fader::Fader(uint8_t analogPin, uint16_t fader, protocol_t protocol) {
+void Key::update(bool state) {
+	if (state != last) {
+		char pattern[OSC_PATTERN_SIZE];
+		memset(pattern, 0, sizeof(pattern));
+		pattern[0] = '/';
+		if (strlen(namePrefix)) {
+			strcat(pattern, namePrefix);
+			pattern[strlen(pattern)] = '/';
+			}
+		if(strlen(namePool)) {
+			strcat(pattern, namePool);
+			if (poolLocal > 0) strcat(pattern, itoa(poolLocal));
+			else strcat(pattern, itoa(poolCommon));
+			pattern[strlen(pattern)] = '/';
+			}
+		if(strlen(namePage)) {
+			strcat(pattern, namePage);
+			if (pageLocal > 0) strcat(pattern, itoa(pageLocal));
+			else strcat(pattern, itoa(pageCommon));
+			pattern[strlen(pattern)] = '/';
+			}
+		strcat(pattern, nameKey);
+		strcat(pattern, itoa(key));
+		if (last == LOW) {
+			last = HIGH;
+			oscMessage(pattern, BUTTON_PRESS);
+			}
+		else {
+			last = LOW;
+			oscMessage(pattern, BUTTON_RELEASE);
+			}
+		} 
+	}
+
+Fader::Fader(uint8_t analogPin, uint16_t fader) {
 	this->analogPin = analogPin;
 	this->fader = fader;
-	this->protocol = protocol;
-	analogLast = 0xFFFF; // forces an osc output of the fader
+	analogLast = 0xFFFF; // forces an receiveData output of the fader
 	updateTime = millis();
 	}
 
-Fader::~Fader() {}
+Fader::Fader(uint16_t fader) {
+	this->fader = fader;
+	analogLast = 0xFFFF; // forces an receiveData output of the fader
+	updateTime = millis();
+	}
+
+void Fader::pool(uint16_t poolLocal) {
+	this->poolLocal = poolLocal;
+	}
 
 void Fader::page(uint16_t pageLocal) {
 	this->pageLocal = pageLocal;
@@ -306,11 +588,10 @@ void Fader::lock(bool state) {
 
 void Fader::update() {
 	if ((updateTime + FADER_UPDATE_RATE_MS) < millis()) {
-		int16_t raw = analogRead(analogPin);
-  	raw = constrain(raw, FADER_THRESHOLD * 2, 1015); // ignore jitter
-  	if (raw < (analogLast - FADER_THRESHOLD) || raw > (analogLast + FADER_THRESHOLD)) {
+		int16_t raw = analogRead(analogPin) >> 2;
+		if (raw < (analogLast - FADER_THRESHOLD) || raw > (analogLast + FADER_THRESHOLD)) {
   	  analogLast = raw;
-  	  int32_t value = map(analogLast, 8, 1015, 0, 100); // convert to 0...100
+			int32_t value = map(analogLast, FADER_THRESHOLD, 255 - FADER_THRESHOLD, 0, 100); // convert to 0...100
   	  if (valueLast != value) {
   	    valueLast = value;
 				if (lockState == true) {
@@ -320,18 +601,66 @@ void Fader::update() {
 					char pattern[OSC_PATTERN_SIZE];
 					memset(pattern, 0, sizeof(pattern));
 					pattern[0] = '/';
-					if (strlen(PREFIX) != 0) {
-						strcat(pattern, PREFIX);
+					if (strlen(namePrefix)) {
+						strcat(pattern, namePrefix);
 						pattern[strlen(pattern)] = '/';
 						}
-					strcat(pattern, PAGE);
-					if (pageLocal > 0) strcat(pattern, itoa(pageLocal));
-					else strcat(pattern, itoa(pageGlobal));
-					pattern[strlen(pattern)] = '/';
-					strcat(pattern, FADER);
+					if(strlen(namePool)) {
+						strcat(pattern, namePool);
+						if (poolLocal > 0) strcat(pattern, itoa(poolLocal));
+						else strcat(pattern, itoa(poolCommon));
+						pattern[strlen(pattern)] = '/';
+						}
+					if(strlen(namePage)) {
+						strcat(pattern, namePage);
+						if (pageLocal > 0) strcat(pattern, itoa(pageLocal));
+						else strcat(pattern, itoa(pageCommon));
+						pattern[strlen(pattern)] = '/';
+						}
+					strcat(pattern, nameFader);
 					strcat(pattern, itoa(fader));
-					oscMessage(pattern, value, protocol);
-					sendOSC();
+					oscMessage(pattern, value);
+					}
+  	  	}
+			}
+		updateTime = millis();
+		}
+	}
+
+void Fader::update(uint16_t analog) {
+	if ((updateTime + FADER_UPDATE_RATE_MS) < millis()) {
+		int16_t raw = analog >> 2;
+  	if (raw < (analogLast - FADER_THRESHOLD) || raw > (analogLast + FADER_THRESHOLD)) {
+  	  analogLast = raw;
+  	  int32_t value = map(analogLast, FADER_THRESHOLD, 255 - FADER_THRESHOLD, 0, 100); // convert to 0...100
+  	  if (valueLast != value) {
+  	    valueLast = value;
+				if (lockState == true) {
+					if ((valueLast <= fetchValue + delta) && (valueLast >= fetchValue - delta)) lockState = false; 
+					}
+				if (lockState == false) {
+					char pattern[OSC_PATTERN_SIZE];
+					memset(pattern, 0, sizeof(pattern));
+					pattern[0] = '/';
+					if (strlen(namePrefix)) {
+						strcat(pattern, namePrefix);
+						pattern[strlen(pattern)] = '/';
+						}
+					if(strlen(namePool)) {
+						strcat(pattern, namePool);
+						if (poolLocal > 0) strcat(pattern, itoa(poolLocal));
+						else strcat(pattern, itoa(poolCommon));
+						pattern[strlen(pattern)] = '/';
+						}
+					if(strlen(namePage)) {
+						strcat(pattern, namePage);
+						if (pageLocal > 0) strcat(pattern, itoa(pageLocal));
+						else strcat(pattern, itoa(pageCommon));
+						pattern[strlen(pattern)] = '/';
+						}
+					strcat(pattern, nameFader);
+					strcat(pattern, itoa(fader));
+					oscMessage(pattern, value);
 					}
   	  	}
 			}
@@ -339,17 +668,23 @@ void Fader::update() {
 		}	
 	}
 
-ExecutorKnob::ExecutorKnob(uint8_t pinA, uint8_t pinB, uint16_t executorKnob, protocol_t protocol, uint8_t direction) {
+ExecutorKnob::ExecutorKnob(uint8_t pinA, uint8_t pinB, uint16_t executorKnob, uint8_t direction) {
 	this->pinA = pinA;
 	this->pinB = pinB;
-	this->direction = direction;
 	pinMode(pinA, INPUT_PULLUP);
 	pinMode(pinB, INPUT_PULLUP);
+	this->direction = direction;
 	this->executorKnob = executorKnob;
-	this->protocol = protocol;
 	}
 
-ExecutorKnob::~ExecutorKnob() {}
+ExecutorKnob::ExecutorKnob(uint16_t executorKnob, uint8_t direction) {
+	this->direction = direction;
+	this->executorKnob = executorKnob;
+	}
+
+void ExecutorKnob::pool(uint16_t poolLocal) {
+	this->poolLocal = poolLocal;
+	}
 
 void ExecutorKnob::page(uint16_t pageLocal) {
 	this->pageLocal = pageLocal;
@@ -372,35 +707,77 @@ void ExecutorKnob::update() {
 		char pattern[OSC_PATTERN_SIZE];
 		memset(pattern, 0, sizeof(pattern));
 		pattern[0] = '/';
-		if (strlen(PREFIX) != 0) {
-			strcat(pattern, PREFIX);
+		if (strlen(namePrefix)) {
+			strcat(pattern, namePrefix);
 			pattern[strlen(pattern)] = '/';
 			}
-		strcat(pattern, PAGE);
-		if (pageLocal > 0) strcat(pattern, itoa(pageLocal));
-		else strcat(pattern, itoa(pageGlobal));
-		pattern[strlen(pattern)] = '/';
-		strcat(pattern, EXECUTOR_KNOB);
+		if(strlen(namePool)) {
+			strcat(pattern, namePool);
+			if (poolLocal > 0) strcat(pattern, itoa(poolLocal));
+			else strcat(pattern, itoa(poolCommon));
+			pattern[strlen(pattern)] = '/';
+			}
+		if(strlen(namePage)) {
+			strcat(pattern, namePage);
+			if (pageLocal > 0) strcat(pattern, itoa(pageLocal));
+			else strcat(pattern, itoa(pageCommon));
+			pattern[strlen(pattern)] = '/';
+			}
+		strcat(pattern, nameExecutorKnob);
 		strcat(pattern, itoa(executorKnob));
-		oscMessage(pattern, (int32_t)encoderMotion, protocol);
-		sendOSC();
+		oscMessage(pattern, (int32_t)encoderMotion);
 		}
 	}
 
-CmdButton::CmdButton(uint8_t pin, const char command[], protocol_t protocol) {
+void ExecutorKnob::update(uint8_t stateA, uint8_t stateB) {
+	encoderMotion = 0;
+	pinACurrent = stateA;	
+	if ((pinALast) && (!pinACurrent)) {
+		if (stateB) {
+			encoderMotion = - 1;
+			}
+		else {
+			encoderMotion = 1;
+			}
+		if (direction == REVERSE) encoderMotion = -encoderMotion;
+		}
+	pinALast = pinACurrent;
+	if (encoderMotion != 0) {
+		char pattern[OSC_PATTERN_SIZE];
+		memset(pattern, 0, sizeof(pattern));
+		pattern[0] = '/';
+		if (strlen(namePrefix)) {
+			strcat(pattern, namePrefix);
+			pattern[strlen(pattern)] = '/';
+			}
+		if(strlen(namePool)) {
+			strcat(pattern, namePool);
+			if (poolLocal > 0) strcat(pattern, itoa(poolLocal));
+			else strcat(pattern, itoa(poolCommon));
+			pattern[strlen(pattern)] = '/';
+			}
+		if(strlen(namePage)) {
+			strcat(pattern, namePage);
+			if (pageLocal > 0) strcat(pattern, itoa(pageLocal));
+			else strcat(pattern, itoa(pageCommon));
+			pattern[strlen(pattern)] = '/';
+			}
+		strcat(pattern, nameExecutorKnob);
+		strcat(pattern, itoa(executorKnob));
+		oscMessage(pattern, (int32_t)encoderMotion);
+		}
+	}
+
+CmdButton::CmdButton(uint8_t pin, const char *command) {
 	this->pin = pin;
 	pinMode(pin, INPUT_PULLUP);
-	last = digitalRead(pin);
-	this->protocol = protocol;
-	if (strlen(PREFIX) != 0) {
-		strcat(pattern, PREFIX);
-		strcat(pattern, "/");
-		}
-	strcat(pattern, "cmd");
+	last = HIGH;
 	strncpy(cmdString, command, OSC_STRING_SIZE - 1);
 	}
 
-CmdButton::~CmdButton() {}
+CmdButton::CmdButton(const char *command) {
+	strncpy(cmdString, command, OSC_STRING_SIZE - 1);
+	}
 
 void CmdButton::update() {
 	if ((digitalRead(pin)) != last) {
@@ -409,229 +786,102 @@ void CmdButton::update() {
 			}
 		else {
 			last = LOW;
-			oscMessage(pattern, cmdString, protocol);
-			sendOSC();
+			char pattern[OSC_PATTERN_SIZE];
+			memset(pattern, 0, sizeof(pattern));
+			pattern[0] = '/';
+			if (strlen(namePrefix)) {
+				strcat(pattern, namePrefix);
+				strcat(pattern, "/");
+				}
+			strcat(pattern, "cmd");
+			oscMessage(pattern, cmdString);
 			}
 		}
 	}
 
-
-OscButton::OscButton(uint8_t pin, const char pattern[], int32_t integer32, protocol_t protocol) {
-	this->pin = pin;
-	this->integer32 = integer32;
-	this->protocol = protocol;
-	pinMode(pin, INPUT_PULLUP);
-	last = digitalRead(pin);
-	typ = INT32;
-	memset(patternString, 0, sizeof(patternString));
-	strcpy(patternString, pattern);
-	}
-
-OscButton::OscButton(uint8_t pin, const char pattern[], float float32, protocol_t protocol) {
-	this->pin = pin;
-	this->float32 = float32;
-	this->protocol = protocol;
-	pinMode(pin, INPUT_PULLUP);
-	last = digitalRead(pin);
-	typ = FLOAT32;
-	memset(patternString, 0, sizeof(patternString));
-	strcpy(patternString, pattern);
-	}
-
-OscButton::OscButton(uint8_t pin, const char pattern[], const char message [], protocol_t protocol) {
-	this->pin = pin;
-	this->protocol = protocol;
-	pinMode(pin, INPUT_PULLUP);
-	last = digitalRead(pin);
-	typ = STRING;
-	memset(patternString, 0, sizeof(patternString));
-	strcpy(patternString, pattern);
-	memset(messageString, 0, sizeof(messageString));
-	strcpy(messageString, message);
-	}
-
-OscButton::OscButton(uint8_t pin, const char pattern[], protocol_t protocol) {
-	this->pin = pin;
-	this->protocol = protocol;
-	pinMode(pin, INPUT_PULLUP);
-	last = digitalRead(pin);
-	typ = NODATA;
-	memset(patternString, 0, sizeof(patternString));
-	strcpy(patternString, pattern);
-	}
-
-OscButton::~OscButton() {}
-
-void OscButton::update() {
-	if ((digitalRead(pin)) != last) {
+void CmdButton::update(bool state) {
+	if (state != last) {
 		if (last == LOW) {
 			last = HIGH;
-			if (typ == INT32) {
-				oscMessage(patternString, (int32_t)0, protocol);
-				sendExternOSC();
-				return;
+			char pattern[OSC_PATTERN_SIZE];
+			memset(pattern, 0, sizeof(pattern));
+			pattern[0] = '/';
+			if (strlen(namePrefix)) {
+				strcat(pattern, namePrefix);
+				strcat(pattern, "/");
 				}
-			if (typ == FLOAT32) {
-				oscMessage(patternString, 0.0f, protocol);
-				sendExternOSC();
-				return;
-				}
+			strcat(pattern, "cmd");
+			oscMessage(pattern, cmdString);
 			}
 		else {
 			last = LOW;
-			switch (typ) {
-				case INT32:
-					oscMessage(patternString, integer32, protocol);
-					break;
-				case FLOAT32:
-					oscMessage(patternString, float32, protocol);
-					break;
-				case STRING:
-					oscMessage(patternString, messageString, protocol);
-					break;
-				case NODATA:
-					oscMessage(patternString, protocol);
-					break;
-				}
-			sendExternOSC();
 			}
-		} 
+		}
 	}
 
-void oscMessage(const char pattern[], const char string[], protocol_t protocol) {
-	memset(oscOut.message, 0, sizeof(oscOut.message));
-	oscOut.size = 0;
+void oscMessage(const char pattern[], const char string[]) {
+	memset(sendMessage.message, 0, sizeof(sendMessage.message));
+	sendMessage.size = 0;
 	int patternLength = strlen(pattern);
 	int stringLength = strlen(string);
-	memcpy(oscOut.message, pattern, patternLength);
+	memcpy(sendMessage.message, pattern, patternLength);
 	int patternOffset = patternLength % 4;
 	int tagStart;
 	if (patternOffset == 0) tagStart = patternLength + 4;
 	else tagStart = patternLength + (4 - patternOffset);
-	memcpy(oscOut.message + tagStart, ",s\0\0", 4);
+	memcpy(sendMessage.message + tagStart, ",s\0\0", 4);
 	int stringStart = tagStart + 4;
-	memcpy(oscOut.message + stringStart, string, stringLength);
+	memcpy(sendMessage.message + stringStart, string, stringLength);
 	int stringOffset = stringLength % 4;
-	if (stringOffset == 0) oscOut.size = stringStart + stringLength + 4;
-	else oscOut.size = stringStart + stringLength + (4 - stringOffset);
-	switch (protocol) {
-		case UDPOSC:
-			oscOut.protocol = UDPOSC;
-			break;
-		case TCP:
-			oscOut.protocol = TCP;
-			break;
-		case TCPSLIP:
-		slipEncode();
-			oscOut.protocol = TCPSLIP;
-			break;
-		}
+	if (stringOffset == 0) sendMessage.size = stringStart + stringLength + 4;
+	else sendMessage.size = stringStart + stringLength + (4 - stringOffset);
+	sendOSC();
 	}
 
-void oscMessage(const char pattern[], float float32, protocol_t protocol) {
-	memset(oscOut.message, 0, sizeof(oscOut.message));
-	oscOut.size = 0;
+void oscMessage(const char pattern[], float float32) {
+	memset(sendMessage.message, 0, sizeof(sendMessage.message));
+	sendMessage.size = 0;
 	int patternLength = strlen(pattern);
-	memcpy(oscOut.message, pattern, patternLength);
+	memcpy(sendMessage.message, pattern, patternLength);
 	int patternOffset = patternLength % 4;
 	int tagStart;
 	if (patternOffset == 0) tagStart = patternLength + 4;
 	else tagStart = patternLength + (4 - patternOffset);
-	memcpy(oscOut.message + tagStart, ",f\0\0", 4);
+	memcpy(sendMessage.message + tagStart, ",f\0\0", 4);
 	int dataStart = tagStart + 4;
-	ftoh(oscOut.message, dataStart, float32);
-	oscOut.size = dataStart + 4;
-	switch (protocol) {
-		case UDPOSC:
-			oscOut.protocol = UDPOSC;
-			break;
-		case TCP:
-			oscOut.protocol = TCP;
-			break;
-		case TCPSLIP:
-			slipEncode();
-			oscOut.protocol = TCPSLIP;
-			break;
-		}
+	ftoh(sendMessage.message, dataStart, float32);
+	sendMessage.size = dataStart + 4;
+	sendOSC();
 	}
 
-void oscMessage(const char pattern[], int32_t int32, protocol_t protocol) {
-	memset(oscOut.message, 0, sizeof(oscOut.message));
-	oscOut.size = 0;
+void oscMessage(const char pattern[], int32_t int32) {
+	memset(sendMessage.message, 0, sizeof(sendMessage.message));
+	sendMessage.size = 0;
 	int patternLength = strlen(pattern);
-	memcpy(oscOut.message, pattern, patternLength);
+	memcpy(sendMessage.message, pattern, patternLength);
 	int patternOffset = patternLength % 4;
 	int tagStart;
 	if (patternOffset == 0) tagStart = patternLength + 4;
 	else tagStart = patternLength + (4 - patternOffset);
-	memcpy(oscOut.message + tagStart, ",i\0\0", 4);
+	memcpy(sendMessage.message + tagStart, ",i\0\0", 4);
 	int dataStart = tagStart + 4;
-	itoh(oscOut.message, dataStart, int32);
-	oscOut.size = dataStart + 4;
-	switch (protocol) {
-		case UDPOSC:
-			oscOut.protocol = UDPOSC;
-			break;
-		case TCP:
-			oscOut.protocol = TCP;
-			break;
-		case TCPSLIP:
-			slipEncode();
-			oscOut.protocol = TCPSLIP;
-			break;
-		}
+	itoh(sendMessage.message, dataStart, int32);
+	sendMessage.size = dataStart + 4;
+	sendOSC();
 	}
 
-void oscMessage(const char pattern[], protocol_t protocol) {
-	memset(oscOut.message, 0, sizeof(oscOut.message));
-	oscOut.size = 0;
+void oscMessage(const char pattern[]) {
+	memset(sendMessage.message, 0, sizeof(sendMessage.message));
+	sendMessage.size = 0;
 	int patternLength = strlen(pattern);
-	memcpy(oscOut.message, pattern, patternLength);
+	memcpy(sendMessage.message, pattern, patternLength);
 	int patternOffset = patternLength % 4;
 	int tagStart;
 	if (patternOffset == 0) tagStart = patternLength + 4;
 	else tagStart = patternLength + (4 - patternOffset);
-	memcpy(oscOut.message + tagStart, ",\0\0\0", 4);
-	oscOut.size = tagStart + 4;
-	switch (protocol) {
-		case UDPOSC:
-			oscOut.protocol = UDPOSC;
-			break;
-		case TCP:
-			oscOut.protocol = TCP;
-			break;
-		case TCPSLIP:
-			slipEncode();
-			oscOut.protocol = TCPSLIP;
-			break;
-		}
-	}
-
-void slipEncode() {
-	uint8_t buffer[OSC_MESSAGE_SIZE] = {0};
-	int slipLength = 0;
-	buffer[0] = END;
-	slipLength++;
-	for (int i = 0; i < oscOut.size; i++) {
-		if (oscOut.message[i] == END) {
-			buffer[slipLength] = ESC;
-			buffer[slipLength + 1] = ESC_END;
-			slipLength = slipLength + 2;
-			}
-		else if (oscOut.message[i] == ESC) {
-			buffer[slipLength] = ESC;
-			buffer[slipLength + 1] = ESC_ESC;
-			slipLength = slipLength + 2;
-			}
-		else {
-			buffer[slipLength] = oscOut.message[i];
-			slipLength++;
-			}
-		}
-	buffer[slipLength] = END;
-	slipLength++;
-	oscOut.size = slipLength;
-	memcpy(oscOut.message, buffer, oscOut.size);
+	memcpy(sendMessage.message + tagStart, ",\0\0\0", 4);
+	sendMessage.size = tagStart + 4;
+	sendOSC();
 	}
 
 float htof(uint8_t *msg, uint8_t dataStart) {

@@ -1,5 +1,14 @@
-# **Arduino OSC library for GrandMA3 consoles v3**
+# **Arduino OSC library for GrandMA3 consoles v4**
 An object orientated library for Arduino to control GrandMA3 consoles with OSC over Ethernet UDP/TCP. The goal of the library is to have a smart toolbox to create your own hardware which covers your needing by endless combinations of hardware elements.
+
+### Changes for v4
+- support for DataPools
+- virtual inputs for touch screens and external I/O devices
+- Pools and Pages classes instead of button class
+- minor improvements for pages and pools functions
+- new Parser class which support also TCP receive
+- simplified network configuration, you can use TCP or UDP
+- no more support for extern OSC buttons, this should done with console macros
 
 ### Changes for v3
 - global / local page() numbering
@@ -15,13 +24,11 @@ An object orientated library for Arduino to control GrandMA3 consoles with OSC o
 - change license to CC BY-NC-SA 4.0
 
 ## Installation
-1. Download from Releases
-2. Follow the instruction on the Arduino website https://www.arduino.cc/en/Guide/Libraries
-You can import the .zip file from the IDE with *Sketch / Include Library / Add .ZIP Library...*
-3. For PlatformIO Unzip and move the folder to the lib folder of your project.
+You can install directly with the library manager of the Arduino IDE.
+Simply search for "gma3"
 
 ## Boards
-You can use any Arduino compatible board which gives you the possibility of an ethernet port. Some boards like Teensy or STM32 Nucleo-F767ZI have an Ethernet port build in, others need an external ethernet port based e.g. on WIZnet W5500 boards like USR-ES1 or Arduino EthernetShield 2. 
+You can use any Arduino compatible board which gives you the possibility of an ethernet connection. Some boards like Teensy or STM32 Nucleo-F767ZI have an Ethernet port build in, others need an external ethernet port based e.g. on WIZnet W5500 boards like USR-ES1 or Arduino EthernetShield 2. 
 WLAN boards like ESP32 should work but are not tested and there is no guarantee for a stable connection. 
 There are also some Arduino based SPS controllers on the market which are ideal for rough environment using 24V.
 
@@ -35,16 +42,26 @@ The in the Arduino board example used Ethernet library only supports the Wiznet 
 **!!! Beware, the Ethernet libraries have different init procedures !!!**
 
 **WIZNet w5500 boards like Ethernet Shield 2**
-- an Arduino compatible Ethernet library like Ethernet3 https://github.com/sstaub/Ethernet3
-- optional for Teensy MAC address https://github.com/sstaub/TeensyID
+- an Arduino compatible Ethernet libraries
+    - Ethernet3 https://github.com/sstaub/Ethernet3
+    - Ethernet https://github.com/arduino-libraries/Ethernet
 
 **Teensy 4.1 with build-in Ethernet**
+
+optional for Teensy MAC address https://github.com/sstaub/TeensyID
+
+based on FNET
 - https://github.com/vjmuzik/NativeEthernet
 - https://github.com/vjmuzik/FNET
+
+or LWIP based
+- https://github.com/ssilverman/QNEthernet
 
 **STM32duino (https://github.com/stm32duino)**
 - https://github.com/stm32duino/STM32Ethernet
 - https://github.com/stm32duino/LwIP
+
+Following Nucleo boards are supported with Ethernet: F207ZG / F429ZI / F746ZG / F756ZG / F767ZI
 
 ## Hardware
 The library support hardware elements like encoders, faders, buttons with some helper functions. The library allows you to use hardware elements as an object and with the use of the helper functions, code becomes much easier to write and read and to understand.
@@ -102,6 +119,10 @@ Before using Ethernet there a some things that must be done. It can be different
 #include "Ethernet3.h"
 #include "EthernetUdp3.h"
 ```
+- or for the original Arduino Ethernet library
+```cpp
+#include "Ethernet.h"
+```
 
 - STM32-Nucleo (e.g. Nucleo-F767ZI)
 ```cpp
@@ -117,100 +138,118 @@ Before using Ethernet there a some things that must be done. It can be different
 #include <NativeEthernetUdp.h>
 ```
 
+- Teensy 4.1 with QNEthernet network stack
+```cpp
+#include <TeensyID.h>
+#include <QNEthernet.h>
+```
+
 2. You need to define IP addresses, ports and sockets 
 
 - **mac** - You need a unique MAC address, for Teensy 3.x / 4.1 you can use the TeensyID library on this GitHub site, for STM32-Nucleo there is a build in MAC address
 - **localIP** - You need a static IP address for your Arduino in the subnet range of network system
-- **subnet** - A subnet range is necessary
+- **dns** - DNS address is optional necessary
+- **gateway** - A gateway range is optional necessary
+- **subnet** - A subnet range is optional necessary
 - **localPort** - This is the destination port of your Arduino
 - **gma3IP** - This is the GrandMA3 console IP address
 - **gma3Port** - This is the destination port of the GrandMA3 console
 
 
+**Example** must done before ```setup()```
 ```cpp
-// configuration example, must done before setup()
-uint8_t mac[] = {0x90, 0xA2, 0xDA, 0x10, 0x14, 0x48}; // MAC Address only needed for WIZNet5500 chips
-// for Teensy this can empty: uint8_t mac[6];
-
+// Network config
 #define GMA3_UDP_PORT 8000 // UDP Port configured in gma3
-#define GMA3_TCP_PORT 9000 // TCP Port configured in gma3
-IPAddress localIP(10, 101, 1, 201); // IP address of the microcontroller board
+#define GMA3_TCP_PORT 9000 // UDP Port configured in gma3
+
+uint8_t mac[] = {0x90, 0xA2, 0xDA, 0x10, 0x14, 0x48};
+IPAddress ip(10, 101, 1, 201); // IP address of the microcontroller board
 IPAddress subnet(255, 255, 0, 0); // subnet range
+IPAddress dns(10, 101, 1, 100); // DNS address of your device
+IPAddress gateway(10, 101, 1, 100); // Gateway address of your device
 uint16_t localUdpPort = GMA3_UDP_PORT;
 IPAddress gma3IP(10, 101, 1, 100); // IP address of the gma3 console
 uint16_t gma3UdpPort = GMA3_UDP_PORT;
 uint16_t gma3TcpPort = GMA3_TCP_PORT;
 ```
-3. You need an UDP/TCP socket, must done before setup().
+3. You need an UDP orTCP socket, must done before ```setup()```.
 ```cpp
-EthernetUDP udp;
-EthernetClient tcp;
+EthernetUDP udp; // for UDP connection
+EthernetClient tcp; // for TCP connection
 ```
-4. In the beginning of setup() you must start network services.
+4. In the beginning of ```setup()``` you must start network services.
 ```cpp
-// for Teensy call: teensyMAC(mac);
-Ethernet.begin(mac, localIP, subnet);
-// for STM32 use: Ethernet.begin(localIP, subnet);
-interfaceGMA3(gma3IP);
-interfaceUDP(udp, gma3UdpPort);
-interfaceTCP(tcp, gma3TcpPort);
+Ethernet.begin(mac, ip, dns, gateway, subnet); // for Arduino ETH library
+interface(udp, gma3IP, gma3UdpPort); // for UDP
+// interface(tcp, TCP, gma3IP, gma3TcpPort); // for TCP
 ```
 
 ## Example
 A simple example for use with an Arduino UNO with EthernetShield 2
 ```cpp
-#include <Ethernet3.h>
-#include <EthernetUdp3.h>
+#include <Ethernet.h>
 #include "gma3.h"
 
-#define BTN_KEY 2
-#define ENC_1_A 3
-#define ENC_1_B 4
-#define BTN_CMD 5
-#define FADER   A0
+// I/O config
+#define BTN_KEY_1 2
+#define BTN_KEY_2 3
+#define BTN_KEY_3 4
+#define BTN_KEY_4 5
+#define ENC_1_A   6
+#define ENC_1_B   7
+#define ENC_2_A   8
+#define ENC_2_B   9
+#define BTN_CMD   10
+#define FADER     A0
 
-// network data
+// Network config
+#define GMA3_UDP_PORT 8000 // UDP Port configured in gma3
+#define GMA3_TCP_PORT 9000 // UDP Port configured in gma3
+
 uint8_t mac[] = {0x90, 0xA2, 0xDA, 0x10, 0x14, 0x48};
-#define GMA3_UDP_PORT  8000 // UDP Port configured in gma3
-#define GMA3_TCP_PORT  9000 // UDP Port configured in gma3
-
-IPAddress localIP(10, 101, 1, 201); // IP address of the microcontroller board
-IPAddress subnet(255, 255, 0, 0); // subnet range
+IPAddress localIp(10, 101, 1, 201); // IP address of the microcontroller board
+IPAddress subnet(255, 255, 0, 0); // optional subnet range
+IPAddress dns(10, 101, 1, 100); // optional DNS address of your device
+IPAddress gateway(10, 101, 1, 100); // optional Gateway address of your device
+uint16_t localUdpPort = GMA3_UDP_PORT;
 IPAddress gma3IP(10, 101, 1, 100); // IP address of the gma3 console
 uint16_t gma3UdpPort = GMA3_UDP_PORT;
 uint16_t gma3TcpPort = GMA3_TCP_PORT;
 
-EthernetUDP udp;
-EthernetClient tcp;
+// EthernetUDP udp; // for UDP
+EthernetClient tcp; // for TCP
 
 // hardware definitions
+Key key101(BTN_KEY_1, 101);
 Fader fader201(FADER, 201);
-Key key201(BTN_KEY, 201, TCP); // using TCP
+Key key201(BTN_KEY_2, 201);
+Key key301(BTN_KEY_3, 301);
 ExecutorKnob enc301(ENC_1_A, ENC_1_B, 301);
+Key key401(BTN_KEY_4, 401);
+ExecutorKnob enc401(ENC_2_A, ENC_2_B, 301);
 CmdButton macro1(BTN_CMD, "GO+ Macro 1");
 
 void setup() {
 	Serial.begin(9600);
-	Ethernet.begin(mac, localIP, subnet);
-	interfaceGMA3(gma3IP);
-	interfaceUDP(udp, gma3UdpPort);
-	interfaceTCP(tcp, gma3TcpPort);
+	Ethernet.begin(mac, localIp);
+	//interface(udp, gma3IP, gma3UdpPort); // for UDP
+	interface(tcp, TCP, gma3IP, gma3TcpPort); // for TCP
 	}
 
 void loop() {
+	key101.update();
 	key201.update();
+	key301.update();
+	key401.update();
 	fader201.update();
 	enc301.update();
+	enc401.update();
 	macro1.update();
 	}
 ```
 
 ### Examples folders
-There are some basic examples for for different board types using the Arduino IDE.
-Also a new example for the Selection class with an Up / Down button for page change and fetching.
-
-### gma3_Arduino_PIO
-Is a project folder for use with PlatformIO and includes an example code for an Arduino MEGA as a starting point. It also include an extra button for a GO command to QLab.
+There are some basic examples for different board types using the Arduino IDE.
 
 ## RAM usage adjustment
 Because using strictly stack allocation of OSC strings,
@@ -218,27 +257,45 @@ you need to adjust the allocation size in the gma3.h file.
 ```cpp
 // OSC settings
 #define OSC_PATTERN_SIZE 64 // length depends on naming conventions
-#define OSC_STRING_SIZE  64 // length depends on maximum command length 
+#define OSC_STRING_SIZE  64 // length depends on maximum command length
+#define OSC_STRING_SIZE  64 // max. size of string arguments
 #define OSC_MESSAGE_SIZE 128 // this should OSC_PATTERN_SIZE + OSC_STRING_SIZE
 ```
 
 ## Transport modes
 - **UDPOSC** standard mode using UDP protocol
-- **TCP** for OSC 1.0 supported by GrandMA3 using TCP
-- **TCPSLIP** for OSC 1.1 e.g. for QLab TCP with SLIP encoding
+- **TCP** pure TCP without extra encoding like SLIP or length declaimer
 
 ## GrandMA3 naming conventions
-This has changed from v1.x to avoid performance problems.
-Naming of prefix and others are done in the gma3.h file.
-The standard prefix is **gma3** now, when changing the prefix you should also change the PREFIX_PATTERN, this is needed for echo replay.
 The naming must the same as in the GrandMA3 software
 ```cpp
-// GMA3 naming conventions
-#define PREFIX "gma3"
-#define PAGE "Page"
-#define FADER "Fader"
-#define EXECUTOR_KNOB "Encoder"
-#define KEY "Key"
+// GMA3 default naming conventions
+char namePrefix[NAME_LENGTH_MAX] = "gma3";
+char namePool[NAME_LENGTH_MAX] = "DataPool"; // Page name
+char namePage[NAME_LENGTH_MAX] = "Page"; // Page name
+char nameFader[NAME_LENGTH_MAX] = "Fader"; // Fader name
+char nameExecutorKnob[NAME_LENGTH_MAX] = "Encoder"; // ExecutorKnob name
+char nameKey[NAME_LENGTH_MAX] = "Key"; // Key name
+```
+
+The names can changed by following functions, this should done in ```setup()```
+```cpp
+void prefixName(const char *prefix);
+void dataPoolName(const char *pool);
+void pageName(const char *page);
+void faderName(const char *fader);
+void executorKnobName(const char *executorKnob);
+void keyName(const char *key);
+```
+
+**Examples**
+```cpp
+prefixName("gma3");
+dataPoolName("DataPool");
+pageName("Page");
+faderName("Fader");
+executorKnobName("Encoder");
+keyName("Key");
 ```
 
 # Setup functions
@@ -250,162 +307,271 @@ Following settings must done in ```setup()```:
 - name of the UDP class member
 - name of the TCP class member
 - IP Address of the GrandMA3 console
-- OSC Port, set in the GrandMA3 console, standard for UDP is port 8000, for TCP 9000
-- IP addresses and ports for external receivers using ```oscButton()``` function
+- OSC Port, set in the GrandMA3 console, standard port for 
+    - UDP is 8000
+    - TCP is 9000
 
-### interfaceGMA3()
+### interface()
 ```cpp
-void interfaceGMA3(IPAddress gma3IP)
+void interface(UDP &udp, IPAddress ip, uint16_t port = 8000);
 ```
-Set the IP address of the GrandMA3 software
+- **UDP &udp** - UDP socket
+- **IPAddress ip** - IP address of the console
+- **uint16_t port = 8000** - UDP port of the GrandMA3 software, default UDP port is 8000
 
-### interfaceUDP()
 ```cpp
-void interfaceUDP(UDP &udp, uint16_t port = 8000)
+void interface(Client &tcp, protocol_t protocol, IPAddress ip, uint16_t port = 9000);
 ```
-Set the UDP socket and port of the GrandMA3 software, standard UDP port is 8000
-
-### interfaceTCP()
-```cpp
-void interfaceTCP(UDP &tcp, uint16_t port = 9000)
-```
-Set the TCP socket and port of the GrandMA3 software, standard TCP port is 9000
-
-### interfaceExternUDP()
-```cpp
-void interfaceExternUDP(UDP &udp, uint16_t port)
-```
-Set the UDP socket and port external receivers accessing via ```oscButton()``` function
-
-### interfaceExternTCP()
-```cpp
-void interfaceExternTCP(UDP &tcp, uint16_t port)
-```
-Set the TCP socket and port external receivers accessing via ```oscButton()``` function
+- **Client &tcp** - TCP socket
+- **protocol_t protocol** - Protocol Type, only TCP without special encoding is supported
+- **IPAddress ip** - IP address of the console
+- **uint16_t port = 9000** - TCP port of the GrandMA3 software, default UDP port is 9000
 
 **Examples**
 ```cpp
-interfaceGMA3(gma3IP);
-interfaceUDP(udp, gma3UdpPort);
-interfaceTCP(tcp, gma3TcpPort);
-interfaceExternUDP(udpQLab, qlabIP, qlabPort);
-interfaceExternTCP(tcpQLab, qlabIP, qlabPort);
+interface(udp, gma3IP, gma3UdpPort);
+interface(tcp, TCP, gma3IP, gma3TcpPort);
+```
+**You can only use TCP or UDP, not both at once!**
+
+# Helper Functions
+
+## Pool Number
+You can change the Pool number common for all classes or for a single class member.
+
+### Common Page Number
+For changing the common page number use
+```cpp
+void poolCommon(uint16_t pool);
+```
+Default is **Pool 1**
+
+Example
+```cpp
+poolCommon(2); // set common pool to 2
+```
+
+### Pool Number by class
+Refer to the classes documentation
+
+### Send Pool Number
+You can change the pool number of the the console
+
+```cpp
+void sendPool(uint16_t pool);
+```
+
+**Example**
+```cpp
+poolSend(2); // set the console pool to 2
 ```
 
 ## Page Number
-You can change the Page number now global or local.
+You can change the Page number common for all classes or for a single class member.
 
-### Global Page Number
-For changing the global page number use
+### Common Page Number
+For changing the common page number use
 ```cpp
-void page(uint16_t page)
+void pageCommon(uint16_t page);
 ```
-Standard is **Page 1**
+Default is **Page 1**
 
-Example
+**Example**
 ```cpp
-page(2); // set global page to 2
+pageCommon(2); // set common page to 2
 ```
 
-### Local Page Number
+### Page Number by class
 Refer to the classes documentation
 
-# Functions
+### Send Page Number
+You can change the page number of the the console
 
-#### command()
+```cpp
+void sendPage(uint16_t page);
+```
+
+**Example**
+```cpp
+pageSend(2); // set the console page to 2
+```
+
+## **command()**
+Send a command message
 ```cpp
 void command(const char command[], protocol_t protocol = UDPOSC);
 ```
-Send a command message
 
-Example
+**Example**
 ```cpp
 command("Page+");
 ```
 
 # Classes
 
+## **Parser**
+This class parse the message send from the console 
+
+### Constructor
+```cpp
+Parser(cbptr callback);
+```
+- **callback** callback pointer to a function which is called when a new message arrived
+
+**Example**
+```cpp
+void parse() {
+  Serial.print("OSC Pattern: ");
+  Serial.print(parser.patternOSC());
+  Serial.print(" String: ");
+  Serial.print(parser.stringOSC());
+  Serial.print(" Integer 1: ");
+  Serial.print(parser.int1OSC());
+  Serial.print(" Integer 2: ");
+  Serial.print(parser.int2OSC());
+  Serial.print(" Float: ");
+  Serial.println(parser.floatOSC());
+  }
+Parser parser(parse);
+```
+
+The OSC data consists of the OSC pattern and max. 3 arguments,
+1 String, up to two Integers and one Float argument
+To get the OSC data inside you can use following class members:
+
+```cpp
+const char* patternOSC(); // returns the pattern string
+int dataStructure(uint8_t level); // returns the parts of the internal data structure as an integer, the level can 0 thru 4
+const char* stringOSC(); // returns the string argument which the command
+int32_t int1OSC(); // returns the 1. integer argument
+int32_t int2OSC(); // returns the 2. integer argument if available
+float floatOSC(); // returns the float argument if available
+```
+
+Example Outputs are
+```
+OSC Pattern: 13.13.1.5.2 String: Go+ Integer 1: 1 Integer 2: 0 Float: 0.00
+OSC Pattern: 13.13.1.5.2 String: Go+ Integer 1: 0 Integer 2: 0 Float: 0.00
+OSC Pattern: 13.13.1.5.2 String: FaderMaster Integer 1: 1 Integer 2: 0 Float: 100.00
+```
+The OSC pattern data is very cryptic because of the representation of the internal structure which there is no real documentation.
+
+### Update
+To get the messages send by console you must call inside the ```loop()``` function
+```cpp
+void update();
+```
+Example, this must happen in the ```loop()``` function
+```cpp
+parser.update();
+```
+
+# Hardware Classes
+It is now possible to use virtual devices like touchscreens e.g. from Nextion https://github.com/sstaub/NextionX2 or I/O expanders for analog (MCP3208 https://github.com/sstaub/MCP_3208) and digital (MCP32017 https://github.com/sstaub/MCP_23017) inputs. You can find Libraries for this devices are on the my GitHub 
+
 ## **Key**
 With this class you can create Key objects which can be triggered with a button.
 
 ### Constructor
 ```cpp
-Key(uint8_t pin, uint16_t key, protocol_t protocol = UDPOSC);
+Key(uint8_t pin, uint16_t key);
+Key(uint16_t key); // for virtual control
 ```
-- ```pin``` are the connection Pin for the button hardware
-- ```key``` is the key number of the executors, refer to the GrandMA3 manual
-- ```protocol``` is the transport protocol you want to use, it can UDPOSC and TCP
+- **pin** are the connection Pin for the button hardware, this is not needed for virtual control
+- **key** is the key number of the executors, refer to the GrandMA3 manual
 
-Example, this should done before the setup()
+**Example** this should done before the ```setup()```
 ```cpp
-Key key201(2, 201, TCP);
-// executor button 201, using pin 2, transport with TCP
+Key key201(2, 201);
+// executor button 201, using pin 2
+Key key201(201); // for virtual control
 ```
 
-### Destructor
+### Pool
 ```cpp
-~Key();
+void pool(uint16_t poolLocal = 0);
 ```
-Use for destructing a Key object
+- **poolLocal** is the pool number of the executors, refer to the GrandMA3 manual
+
+Set a local page number which overrides the global.
+
+**Example**
+```cpp
+key201.pool(2); // set local pool 2
+key201.pool(); // reset to global pool
+```
 
 ### Page
 ```cpp
 void page(uint16_t pageLocal = 0);
 ```
-- ```pageLocal``` is the page number of the executors, refer to the GrandMA3 manual
+- **pageLocal** is the page number of the executors, refer to the GrandMA3 manual
 
 Set a local page number which overrides the global.
 
-Example
+**Example**
 ```cpp
 key201.page(2); // set local page 2
 key201.page(); // reset to global page
 ```
 
 ### Update
-To get the actual button state you must call inside the ```loop()``` function
 ```cpp
 void update();
+void update(bool state); // for virtual control
 ```
+- **state** optional for virtual devices, TRUE if button press
+
+To get the actual button state you must call inside the ```loop()``` function
+
 Example, this must happen in the ```loop()``` function
 ```cpp
 key201.update();
+// key201.update(TRUE);
 ```
 
 ## **Fader**
 This class allows you to control a fader containing  with a hardware (slide) potentiometer as an executor fader.
 
 ### Timing constants
-```
+```cpp
 #define FADER_UPDATE_RATE_MS  1 // update rate, must low at possible for fetching
 #define FADER_THRESHOLD       4 // Jitter threshold of the faders
 ```
 
 ### Constructor
 ```cpp
-Fader(uint8_t analogPin, uint16_t fader, protocol_t protocol = UDPOSC);
+Fader(uint8_t analogPin, uint16_t fader);
+Fader(uint16_t fader); // for virtual control
 ```
-- ```analogPin``` are the connection Analog Pin for the fader leveler
-- ```fader``` is the fader number of the executors, refer to the GrandMA3 manual
-- ```protocol``` is the transport the protocol you want to use, it can UDPOSC and TCP, UDPOSC is recommended
+- **analogPin** are the connection Analog Pin for the fader leveler, this is not needed for virtual control
+- **fader** is the fader number of the executors, refer to the GrandMA3 manual
 
-Example, this should done before the setup()
+Example, this should done before the ```setup()```
 ```cpp
-Fader fader201(A0, 201);
-// leveler is Analog Pin A0, executor number of the fader  is 201, using UDPOSC as standard
+Fader fader201(A0, 201); // leveler is Analog Pin A0, executor number of the fader is 201
+Fader fader201(201); // for virtual control
 ```
 
-### Destructor
+### Pool
 ```cpp
-~Fader();
+void pool(uint16_t poolLocal = 0);
 ```
-Use for destructing a Fader object
+- **poolLocal** is the pool number of the executors, refer to the GrandMA3 manual
+
+Set a local page number which overrides the global.
+
+**Example**
+```cpp
+fader201.pool(2); // set local pool 2
+fader201.pool(); // reset to global pool
+```
 
 ### Page
 ```cpp
 void page(uint16_t pageLocal = 0);
 ```
-- ```pageLocal``` is the page number of the executors, refer to the GrandMA3 manual
+- **pageLocal** is the page number of the executors, refer to the GrandMA3 manual
 
 Set a local page number which overrides the global.
 
@@ -430,7 +596,7 @@ int32_t value = fader201.value();
 ```cpp
 void fetch(uint16_t value);
 ```
-- ```value``` unlock value
+- **value** unlock value
 
 Lock the sending of OSC fader data until the value defined in fetch() is reached.<br>
 This functionality is intended for page changing. So you need to fetch the fader before you can use it.
@@ -447,8 +613,8 @@ void lock(bool state);
 ```
 
 Get or set the state of the fetch function, can used for indication of the fader state or force a new state.
-- ```true``` locked fader
-- ```false``` unlocked fader
+- **true** locked fader
+- **false** unlocked fader
 
 Example
 ```cpp
@@ -475,39 +641,53 @@ fader201.jitter(2); // set fetch range to +/- 2
 To get the actual button state you must call inside the ```loop()``` function
 ```cpp
 void update();
+void update(uint16_t value); // for virtual control
 ```
+
+- **value** optional for virtual inputs with 10 bits
+
 Example, this must happen in the ```loop()``` function
 ```cpp
 fader201.update();
+void update(255); // about 25%
 ```
 
 ## **ExecutorKnob**
 The ExecutorKnob class creates an encoder object which allows to control the executor knobs:
 ```cpp
-ExecutorKnob(uint8_t pinA, uint8_t pinB, uint16_t executorKnob, protocol_t protocol = UDPOSC, uint8_t direction = FORWARD);
+ExecutorKnob(uint8_t pinA, uint8_t pinB, uint16_t executorKnob, uint8_t direction = FORWARD);
+ExecutorKnob(uint16_t executorKnob, uint8_t direction = FORWARD);
 ```
-- ```pinA``` and **pinB** are the connection Pins for the encoder hardware
-- ```executorKnob``` is the number of the executor knob, refer to the GrandMA3 manual
-- ```protocol``` is the transport protocol you want to use, it can UDPOSC and TCP
-- ```direction``` is used for changing the direction of the encoder to clockwise if pinA and pinB are swapped. The directions are FORWARD (standard) or REVERSE
+- **pinA** and **pinB** are the connection Pins for the encoder hardware, this is not needed for virtual control
+- **executorKnob** is the number of the executor knob, refer to the GrandMA3 manual
+- **direction** is used for changing the direction of the encoder to clockwise if pinA and pinB are swapped. The directions are FORWARD (standard) or REVERSE
 
-Example, this should done before the setup()
+Example, this should done before the ```setup()```
 ```cpp
-ExecutorKnob enc301(3, 4, 301, UDPOSC, REVERSE); 
-// the encoder pins are 3/4, the number of the executorKnob is 301, send with UDP, encoder pins are swapped (REVERSE)
+ExecutorKnob enc301(3, 4, 301, REVERSE);
+// the encoder pins are 3/4, the number of the executorKnob is 301, encoder pins are swapped (REVERSE)
+ExecutorKnob enc301(301, REVERSE); // for virtual control
 ```
 
-### Destructor
+### Pool
 ```cpp
-~ExecutorKnob();
+void pool(uint16_t poolLocal = 0);
 ```
-Use for destructing a Fader object
+- **poolLocal** is the pool number of the executors, refer to the GrandMA3 manual
+
+Set a local page number which overrides the global.
+
+**Example**
+```cpp
+enc301.pool(2); // set local pool 2
+enc301.pool(); // reset to global pool
+```
 
 ### Page
 ```cpp
 void page(uint16_t pageLocal = 0);
 ```
-- ```pageLocal``` is the page number of the executors, refer to the GrandMA3 manual
+- **pageLocal** is the page number of the executors, refer to the GrandMA3 manual
 
 Set a local page number which overrides the global.
 
@@ -521,205 +701,183 @@ enc301.page(); // reset to global page
 To get the actual encoder state you must call inside the ```loop()``` function
 ```cpp
 void update();
+void update(uint8_t stateA, uint8_t stateB); // for virtual control
 ```
+- **stateA** optional for virtual devices, TRUE if encoderA contacts
+- **stateB** optional for virtual devices, TRUE if encoderB contacts
+
 Example, this must happen in the ```loop()``` function
 ```cpp
 enc301.update();
+enc301.update(TRUE, FALSE); // for virtual control
 ```
 
 ## **CmdButton**
 With this class you can create a button which allows to send commands to the console.
 ```cpp
-CmdButton(uint8_t pin, const char command[], protocol_t protocol = UDPOSC);
+CmdButton(uint8_t pin, const char command[]);
+CmdButton(const char *command); // for virtual control
 ```
-- ```pin``` are the connection Pin for the button hardware
-- ```command``` is a command string which should send to the console, refer also to the GrandMA3 manual
-- ```protocol``` is the transport protocol you want to use, it can UDPOSC and TCP
+- **pin** are the connection Pin for the button hardware, this not needed for virtual control
+- **command** is a command string which should send to the console, refer also to the GrandMA3 manual
 
-
-Example, this should done before the setup()
+Example, this should done before the ```setup()```
 ```cpp
-CmdButton macro1(A2, "GO+ Macro 1");
-// button on pin A2, fires Macro 1
+CmdButton macro1(A2, "GO+ Macro 1"); // button on pin A2, fires Macro 1
+CmdButton macro1("GO+ Macro 1"); // for virtual control
 ```
-
-### Destructor
-```cpp
-~CmdButton();
-```
-Use for destructing a Fader object
 
 ### Update
 To get the actual button state you must call inside the ```loop()``` function
 ```cpp
 void update();
+void update(bool state); // for virtual control
 ```
+- **state** optional for virtual devices, TRUE if button press
+
 Example, this must happen in the ```loop()``` function
 ```cpp
 macro1.update();
+macro1.update(TRUE); // for virtual button press
 ```
 
-## **OscButton**
-With this class you can create generic buttons which allows you to control other OSC compatible software in the network like QLab. The class initializer is overloaded to allow sending different OSC data types: Integer 32 bit, Float, Strings or no data.<br>
-**! When using integer or float, 0 or 0.0 is explicit send when releasing the button !**
+## **Pages**
+With this class you can create a Page object which can be controlled with a two button.
 
 ### Constructor
 ```cpp
-OscButton(uint8_t pin, const char pattern[], int32_t integer32, protocol_t protocol = UDPOSC);
-OscButton(uint8_t pin, const char pattern[], float float32, protocol_t protocol = UDPOSC);
-OscButton(uint8_t pin, const char pattern[], const char message[], protocol_t protocol = UDPOSC);
-OscButton(uint8_t pin, const char pattern[], protocol_t protocol = UDPOSC);
+Pages(uint8_t pinUp, uint8_t pinDown, uint8_t pagesStart, uint8_t pagesEnd, send_t mode = GLOBAL, cbptr callback = nullptr);
+Pages(uint8_t pagesStart, uint8_t pagesEnd, send_t mode = GLOBAL, cbptr callback = nullptr); // for virtual control
 ```
-- ```pin``` the connection Pin for the button hardware
-- ```pattern``` the OSC address pattern
-- ```integer32``` optional Integer data to send, you must cast this data e.g. ```(int32_t)1```
-- ```float32``` optional Float data to send, you must cast this data e.g. ```1.0f```
-- ```message``` optional String to send
-- ```protocol``` is the transport protocol you want to use, it can UDPOSC, TCP and TCPSLIP
+- **pinUp** are the connection Pin for the up button hardware, this is not needed for virtual control
+- **pinDown** are the connection Pin for the up button hardware, this is not needed for virtual control
+- **pageStart** is the start page number
+- **pageLast** is the last used page number
+- **mode** you can control how page information is used
+    - LOCAL page is only used for internal use
+    - CONSOLE page is only send to the console
+    - GLOBAL page is used overall
+- **callback** callback pointer to a function which is called when a button is pressed, within the callback function you can proceed fetch() or display functions using ```currentPage()``` and ```lastPage()``` functions
 
-
-Example for Ethernet UDP using a button on Pin 0, this should done before the setup()
+**Example** this should done before the ```setup()```
 ```cpp
-#define QLAB_GO_PIN 0
-IPAddress qlabIP(10, 101, 1, 101); // IP of QLab
-uint16_t qlabPort = 53000; // QLab receive port
-OscButton qlabGo(QLAB_GO_PIN , "/go", qlabIP, qlabPort);
+Pages pages(2, 3, 1, PAGES, GLOBAL, pageChange); // up button pin 2, down button pin 3, start with page 1, last page is 4, global control, pageChange() is callback function name
+Pages pages(1, PAGES, GLOBAL, pageChange); // for virtual control
 ```
 
-### Destructor
+### currentPage
 ```cpp
-~OscButton();
-```
-Use for destructing a Fader object
-
-### Update
-To get the actual button state you must call inside the ```loop()``` function
-```cpp
-void update();
-```
-Example, this must happen in the ```loop()``` function
-```cpp
-qlabGo.update();
+uint16_t currentPage();
 ```
 
-## **Button**
-This is a simple class to create a button which triggers a callback function.<br>
-There is following order in the program code needed before ```setup()```:
-- Initialization of the hardware classes
-- Declaration (and optional Initialization) of the callback functions
-- Initialization of the Button classes
-
-### Constructor
-```cpp
-Button(uint8_t pin, cbptr callback);
-```
-- ```pin``` are the connection Pin for the button hardware
-- ```callback``` pointer to the callback function for the button
-
-Example, this should done before the setup()
-```cpp
-#define PAGES 4
-int pageNumber = 1; // start page
-void upButton() { // callback function the Up button
-	if (pageNumber >= PAGES) pageNumber = 1; // wrap around
-	else pageNumber++;
-	char cmd[12] = "Page ";
-	strcat(cmd, itoa(pageNumber));
-	command(cmd); // send command
-	page(pageNumber); // change global page
-	Serial.print("Page ");
-	Serial.println(pageNumber);
-	}
-void downButton() { // callback function the Up button
-	if (pageNumber <= 1) pageNumber = PAGES;
-	else pageNumber--;
-	char cmd[12] = "Page ";
-	strcat(cmd, itoa(pageNumber));
-	command(cmd); // send command
-	page(pageNumber); // change global page
-	Serial.print("Page ");
-	Serial.println(pageNumber);
-	}
-Button pageUp(2, upButton);
-Button pageDown(3, downButton);
-```
-
-### Update
-To get the actual button state you must call inside the ```loop()``` function
-```cpp
-void update();
-```
-Example, this must happen in the ```loop()``` function
-```cpp
-pageUp.update();
-pageDown.update();
-```
-
-## Send OSC message manually
-Two steps are needed for send OSC messages manually:
-1. Create an OSC message using
-```cpp
-void oscMessage(const char pattern[], int32_t int32, protocol_t protocol = UDPOSC);
-void oscMessage(const char pattern[], float float32, protocol_t protocol = UDPOSC);
-void oscMessage(const char pattern[], const char string[], protocol_t protocol = UDPOSC);
-void oscMessage(const char pattern[], protocol_t protocol = UDPOSC);
-```
-- ```const char pattern[]``` is the OSC pattern 
-- ```int32_t int32``` for integer data
-- ```float float32``` for float date
-- ```const char string[]``` for strings
-- it is also possible to send no argument, e.g. for QLab Go cmd
-- ```protocol_t protocol``` is the protocol type UDPOSC, TCP or TCPSLIP
-
-1. Send an OSC Message, depending on the chosen interface.
-This functions can called inside setup() or loop() after init the interface.
-```cpp
-void sendUDP();
-void sendExternUDP();
-void sendTCP();
-void sendExternTCP();
-```
-
-## Receive UDP data with ```receiveUdp()```
-You can receive the data send by the GrandMA software. Only UDP receive is supported.
-With the ```receiveUdp()``` function you get the data which are automatic parsed to seperate the OSC data.
-```cpp
-bool receiveUDP(); // returns true if there is data present
-```
-
-The OSC data consists of the OSC pattern and max. 3 arguments,
-1 String, up to two Integers and one Float argument
-To get the OSC data inside you can use following functions:
-
-```cpp
-patternOSC() // returns the pattern string
-stringOSC() // returns the string argument which the command
-int1OSC() // returns the 1. integer argument
-int2OSC() // returns the 2. integer argument if available
-floatOSC() // returns the float argument if available
-```
+Get the current page number.
 
 **Example**
-This must happen in the ```loop()``` function
 ```cpp
-if (receiveUDP()) {
-	Serial.print("OSC Pattern: ");
-	Serial.print(patternOSC());
-	Serial.print(" String: ");
-	Serial.print(stringOSC());
-	Serial.print(" Integer 1: ");
-	Serial.print(int1OSC());
-	Serial.print(" Integer 2: ");
-	Serial.print(int2OSC());
-	Serial.print(" Float: ");
-	Serial.println(floatOSC());
-	}
+uint16_t pageCurrent = pages.currentPage()
 ```
 
-Example Outputs are
+### lastPage
+```cpp
+uint16_t lastPage();
 ```
-OSC Pattern: /gma3/13.13.1.5.2 String: Go+ Integer 1: 1 Integer 2: 0 Float: 0.00
-OSC Pattern: /gma3/13.13.1.5.2 String: Go+ Integer 1: 0 Integer 2: 0 Float: 0.00
-OSC Pattern: /gma3/13.13.1.5.2 String: FaderMaster Integer 1: 1 Integer 2: 0 Float: 100.00
+
+Get the last used page number.
+
+**Example**
+```cpp
+uint16_t pageLast = pages.lastPage()
 ```
-The OSC pattern data is very cryptic because of the representation of the internal structure which there is no real documentation.
+
+### Update
+```cpp
+void update();
+void update(bool stateUp, bool stateDown); // for virtual control
+```
+- **stateUp** state of the up button, optional for virtual devices, TRUE if button press
+- **stateDown** state of the down button, optional for virtual devices, TRUE if button press
+
+To get the actual button states you must call inside the ```loop()``` function
+
+Example, this must happen in the ```loop()``` function
+```cpp
+pages.update();
+pages.update(TRUE, FALSE); // for virtual control
+```
+
+## **Pools**
+With this class you can create a Pool object which can be controlled with a two button.
+
+### Constructor
+```cpp
+Pools(uint8_t pinUp, uint8_t pinDown, uint8_t poolsStart, uint8_t poolsEnd, send_t mode = GLOBAL, cbptr callback = nullptr);
+Pools(uint8_t pagesStart, uint8_t pagesEnd, send_t mode = GLOBAL, cbptr callback = nullptr); // for virtual control
+```
+- **pinUp** are the connection Pin for the up button hardware, this is not needed for virtual control
+- **pinDown** are the connection Pin for the up button hardware, this is not needed for virtual control
+- **pageStart** is the start page number
+- **pageLast** is the last used page number
+- **mode** you can control how page information is used
+    - LOCAL page is only used for internal use
+    - CONSOLE page is only send to the console
+    - GLOBAL page is used overall
+- **callback** callback pointer to a function which is called when a button is pressed, within the callback function you can proceed fetch() or display functions using ```currentPage()``` and ```lastPage()``` functions
+
+**Example** this should done before the ```setup()```
+```cpp
+Pools pools(4, 5, 1, PAGES, GLOBAL, pageChange); // up button pin 4, down button pin 5, start with page 1, last page is 4, global control, pageChange() is callback function name
+Pages pages(1, PAGES, GLOBAL, pageChange); // for virtual control
+```
+
+### currentPool
+```cpp
+uint16_t currentPool();
+```
+
+Get the current pool number.
+
+**Example**
+```cpp
+uint16_t poolCurrent = pools.currentPool()
+```
+
+### lastPool
+```cpp
+uint16_t lastPool();
+```
+
+Get the last used pool number.
+
+**Example**
+```cpp
+uint16_t poolLast = pools.lastPool()
+```
+
+### Update
+```cpp
+void update();
+void update(bool stateUp, bool stateDown); // for virtual control
+```
+- **stateUp** state of the up button, optional for virtual devices, TRUE if button press
+- **stateDown** state of the down button, optional for virtual devices, TRUE if button press
+
+To get the actual button states you must call inside the ```loop()``` function
+
+Example, this must happen in the ```loop()``` function
+```cpp
+pools.update();
+pools.update(TRUE, FALSE); // for virtual control
+```
+
+# Send an OSC message manually
+Send an OSC message with different data tags
+```cpp
+void oscMessage(const char pattern[], int32_t int32);
+void oscMessage(const char pattern[], float float32);
+void oscMessage(const char pattern[], const char string[]);
+void oscMessage(const char pattern[]);
+```
+- **const char pattern[]** is the OSC pattern 
+- **int32_t int32** for integer data
+- **float float32** for float date
+- **const char string[]** for strings
