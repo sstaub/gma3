@@ -104,9 +104,6 @@ Please refer to the GrandMA3 manual for more information about using OSC on Gran
 Here an example OSC setup in the GrandMA3 software
 ![GrandMA3 OSC Setup](https://github.com/sstaub/gma3/blob/main/images/gma3_osc_setup.png?raw=true)
 
-For use with PlatformIO https://platformio.org, as a recommended IDE with MS VSCode, there is an extra start example folder called **gma3_Arduino_PIO**, you must add the needed libraries manually.
-![Development on PlatformIO](https://github.com/sstaub/gma3/blob/main/images/gma3_development.png?raw=true)
-
 If you have wishes for other functions or classes enter the discussion forum. If you find bugs make an issue, nobody is perfect.
 
 ### Ethernet configuration and initialization
